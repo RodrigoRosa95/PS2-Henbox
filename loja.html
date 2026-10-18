@@ -109,6 +109,7 @@
   <button data-aba="snes">🕹 Super Nintendo</button>
   <input id="busca" placeholder="🔍 Buscar" autocomplete="off">
 </nav>
+<div id="vitrine" hidden style="margin:0 16px 8px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.08);font-size:13px">Vitrine do projeto <a href="https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl" style="color:inherit">ps2GamesCLoudinOPl</a>: só para olhar. Os jogos são da coleção pessoal do autor e não são distribuídos; jogar e baixar funcionam só no PS2, pela TV box.</div>
 <main><div class="grade" id="grade"></div><div class="vazio" id="vazio" hidden>Nenhum jogo aqui.</div></main>
 
 <div class="veu" id="veu">
@@ -136,6 +137,10 @@ let dados = {jogos:[], livre:0, total:0}, aba = 'todos', aberto = null, armado =
 // ROMs de SNES (extraídas do ISO do emulador que o usuário já tinha): vão para o pendrive USB do PS2, gravadas
 // pelo próprio navegador do PS2 — por isso o botão só funciona com a loja aberta no PS2.
 let roms = [], navegadorAberto = false;
+/* Aberta pelo HTTPS público (18/10/2026, sem porta: túnel do Cloudflare): vitrine só de leitura, sem os botões de ação. */
+const VITRINE = location.protocol === 'https:' && !location.port;
+if (VITRINE) { document.body.classList.add('vitrine'); document.getElementById('vitrine').hidden = false;
+  document.head.insertAdjacentHTML('beforeend', '<style>body.vitrine #dacoes .btn{display:none}</style>'); }
 let retro = {tipo: 'ra', arquivo: '__retroarch__', nome: 'SNESticle (emulador)', tamanho: 0, capa: 'capas/snes/_retroarch.jpg', pedido: {}, versao: ''};
 
 function selo(j) {

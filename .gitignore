@@ -1,5 +1,6 @@
 # segredos e chaves
 *.chave
+*.convite
 *.jks
 config.json
 remoto.json

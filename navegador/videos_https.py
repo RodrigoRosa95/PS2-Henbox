@@ -14,6 +14,8 @@ As ações da loja (gravar no pendrive, jogar) NÃO passam por aqui: quem execut
 Chave no cabeçalho "X-Chave" (arquivo videos_https.chave, criado na primeira vez).
 Loja num navegador comum (18/10/2026, só olhar): abrir uma vez /loja/?chave=<chave> grava um cookie que libera só os
 caminhos de leitura da loja (/loja/*) — não vale para vídeos, ROMs nem ISOs — e volta para /loja/loja.html sem a chave.
+Link público de divulgação (README do GitHub): /loja/?convite=<convite> faz o mesmo com o código de videos_https.convite,
+separado da chave. Para cancelar o link: apagar o arquivo (ou trocar o código) e reiniciar (pm2 restart ps2-videos).
 """
 import hashlib, hmac, json, os, re, secrets, sys, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,6 +33,9 @@ if not os.path.exists(ARQ_CHAVE):
     with open(os.open(ARQ_CHAVE, os.O_WRONLY | os.O_CREAT, 0o600), 'w') as f:
         f.write(secrets.token_urlsafe(32))
 CHAVE = open(ARQ_CHAVE).read().strip()
+ARQ_CONVITE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos_https.convite')
+CONVITE = open(ARQ_CONVITE).read().strip() if os.path.exists(ARQ_CONVITE) else ''
+COOKIE_PUBLICO = hmac.new(CHAVE.encode(), b'loja-publica:' + CONVITE.encode(), hashlib.sha256).hexdigest()
 # cookie do navegador: derivado da chave, só para a loja (quem pegar o cookie não baixa vídeo, ROM nem ISO)
 COOKIE_LOJA = hmac.new(CHAVE.encode(), b'loja-navegador', hashlib.sha256).hexdigest()
 
@@ -68,7 +73,8 @@ class H(BaseHTTPRequestHandler):
     def cookie_loja(self):
         for parte in self.headers.get('Cookie', '').split(';'):
             nome, _, valor = parte.strip().partition('=')
-            if nome == 'loja' and secrets.compare_digest(valor, COOKIE_LOJA):
+            if nome == 'loja' and (secrets.compare_digest(valor, COOKIE_LOJA)
+                                   or (CONVITE and secrets.compare_digest(valor, COOKIE_PUBLICO))):
                 return True
         return False
 
@@ -79,6 +85,10 @@ class H(BaseHTTPRequestHandler):
             return self.responder(303, extra={'Location': '/loja/loja.html', 'Cache-Control': 'no-store',
                                               'Set-Cookie': f'loja={COOKIE_LOJA}; Path=/loja/; Max-Age=31536000; '
                                                             'Secure; HttpOnly; SameSite=Strict'})
+        if CONVITE and secrets.compare_digest(q.get('convite', [''])[0], CONVITE):
+            return self.responder(303, extra={'Location': '/loja/loja.html', 'Cache-Control': 'no-store',
+                                              'Set-Cookie': f'loja={COOKIE_PUBLICO}; Path=/loja/; Max-Age=2592000; '
+                                                            'Secure; HttpOnly; SameSite=Lax'})
         if self.cookie_loja():
             return self.responder(303, extra={'Location': '/loja/loja.html'})
         return self.responder(403, 'Abra uma vez /loja/?chave=… com a chave da TV box.'.encode(), 'text/plain; charset=utf-8')

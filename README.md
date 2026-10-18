@@ -6,6 +6,9 @@ rodar **pela rede**, lidos aos pedaços do HD da coleção enquanto você joga, 
 
 ![Arquitetura](docs/arquitetura.png)
 
+**Veja a loja ao vivo:** [vitrine da loja (só para olhar)](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb). São
+os jogos da coleção pessoal do autor; nada é baixado pela vitrine. Jogar e baixar funcionam só no PS2, pela TV box.
+
 ## Telas (como aparecem no PS2, 640x448)
 
 | Menu | Loja |
