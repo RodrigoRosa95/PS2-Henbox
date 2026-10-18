@@ -115,6 +115,14 @@ public class Principal extends Activity {
         });
     }
 
+    /** Mostrado quando a TV box não aparece na rede ou recusa a conexão (ideia do CetusPlay: guia para ligar o ADB). */
+    static final String AJUDA_ADB = "Como ligar o ADB pela rede na TV box:\n"
+            + " 1. Configurações → Sobre / Informações → clique 7 vezes em \"Número da versão\" (libera o modo desenvolvedor).\n"
+            + " 2. Configurações → Opções do desenvolvedor → ligue \"Depuração USB\" e \"Depuração ADB pela rede\" (porta 5555).\n"
+            + "    Em algumas boxes fica em Configurações → Sistema → ADB, ou no app \"Configurações\" da própria marca.\n"
+            + " 3. Celular e TV box na mesma rede. Procure de novo ou digite o IP (Configurações → Rede da TV box).\n"
+            + " 4. Quando conectar, aceite \"Permitir depuração\" na TV e marque \"Sempre permitir\".";
+
     void conectar() {
         final String ip = lido(campoBox);
         if (ip.length() == 0) { escrever("Digite o IP da TV box."); return; }
@@ -132,6 +140,7 @@ public class Principal extends Activity {
                     mostrarEstado();
                 } catch (Exception e) {
                     escrever("Não conectou: " + e.getMessage());
+                    if (e instanceof java.net.ConnectException || e instanceof java.net.SocketTimeoutException) escrever(AJUDA_ADB);
                 }
             }
         });
@@ -165,7 +174,7 @@ public class Principal extends Activity {
                 ui.post(new Runnable() {
                     public void run() {
                         achadas.removeAllViews();
-                        if (ips.isEmpty()) escrever("Nenhuma TV box com ADB pela rede encontrada.");
+                        if (ips.isEmpty()) { escrever("Nenhuma TV box com ADB pela rede encontrada."); escrever(AJUDA_ADB); }
                         for (final String ip : ips) {
                             botao(achadas, "TV box em " + ip, new Runnable() { public void run() { campoBox.setText(ip); conectar(); } });
                         }

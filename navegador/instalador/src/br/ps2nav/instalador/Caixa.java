@@ -78,11 +78,43 @@ public class Caixa {
 
     void esperar(long ms) { try { Thread.sleep(ms); } catch (InterruptedException e) { } }
 
+    /** Apps (~75 MB, instalados e cópia temporária), pacotes do Termux (~250 MB) e os servidores. */
+    static final long ESPACO_MINIMO_MB = 400;
+
+    /** MB livres em /data (onde ficam os apps e o Termux); -1 se não deu para ler. Conferido antes de enviar os APKs,
+     *  como o CetusPlay faz (ele avisa "insufficient_storage"). */
+    long livreMb() throws IOException {
+        String r = su("df -k /data | tail -1");
+        String[] c = r.trim().split("\\s+");
+        try {
+            return Long.parseLong(c[3]) / 1024;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    /** Permissões pelo ADB, sem a pessoa tocar na TV (como o CetusPlay faz com o appops): Termux e o app do navegador
+     *  fora da economia de bateria e liberados para rodar em segundo plano. Comandos que o Android da box não tiver
+     *  só falham calados. */
+    void liberarPermissoes() throws IOException {
+        for (String pac : new String[] {"com.termux", "com.termux.boot", "br.ps2nav"}) {
+            su("dumpsys deviceidle whitelist +" + pac + " >/dev/null 2>&1; appops set " + pac
+                    + " RUN_IN_BACKGROUND allow 2>/dev/null; appops set " + pac + " RUN_ANY_IN_BACKGROUND allow 2>/dev/null");
+        }
+        su("pm grant com.termux android.permission.POST_NOTIFICATIONS 2>/dev/null; "
+                + "pm grant br.ps2nav android.permission.POST_NOTIFICATIONS 2>/dev/null");
+    }
+
     void instalar() throws IOException {
         log.aviso("Conferindo root…");
         if (!temRoot()) throw new IOException("a TV box não tem root (su). O instalador precisa de root.");
         String abi = abi();
         log.aviso("Processador: " + abi);
+        long livre = livreMb();
+        log.aviso("Espaço livre na box: " + livre + " MB");
+        if (livre >= 0 && livre < ESPACO_MINIMO_MB)
+            throw new IOException("pouco espaço na box (" + livre + " MB livres; precisa de uns " + ESPACO_MINIMO_MB
+                    + " MB para os apps, o Python do Termux e os servidores). Apague apps ou arquivos e tente de novo.");
         String termux = abi.contains("arm64") ? "termux-arm64-v8a.apk" : "termux-armeabi-v7a.apk";
 
         if (!instalado("com.termux")) { log.aviso("Instalando o Termux…"); instalarApk(termux); }
@@ -132,6 +164,8 @@ public class Caixa {
             if (!suTermux("python3 -c 'import PIL, websocket; print(1)' 2>/dev/null").equals("1"))
                 throw new IOException("Python não ficou pronto (veja ~/instalar-ps2nav.log na box)");
         }
+        log.aviso("Liberando o Termux e o navegador para rodar sempre…");
+        liberarPermissoes();
         log.aviso("Ligando os servidores…");
         iniciar();
         esperar(15000);

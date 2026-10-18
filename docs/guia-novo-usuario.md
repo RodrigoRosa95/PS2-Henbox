@@ -6,6 +6,10 @@ Oct 18, 2026 · @Rodrigo Rosa
 
 O PS2 Navegador transforma o PlayStation 2 numa central de mídia: pelo controle você escolhe jogos e vídeos numa loja na tela, e a TV box ao lado faz todo o trabalho pesado.
 
+O PS2 acessa o navegador da TV box (o Chrome do Android, pelo WebView) como se fosse um VNC. A box desenha a página e manda a imagem pronta para o PS2. O PS2 só mostra a tela e devolve os botões do controle.
+
+A loja de jogos é parecida com a loja da HEN do PS3: você navega pelas capas e escolhe o jogo. A diferença é que dá para fazer duas coisas direto do PS2: baixar o jogo da loja para o pendrive, ou rodar o jogo em nuvem, sem copiar nada.
+
 O que dá para fazer hoje:
 
 - **Jogar PS2 pela rede**, direto do HD da coleção, sem copiar o jogo para o pendrive ("☁ Jogar pela rede").
