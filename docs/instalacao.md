@@ -3,6 +3,21 @@
 O que você precisa ter e onde vai cada arquivo. O resumo: o **memory card só precisa abrir o OPL**; o **pendrive do PS2
 só precisa da pasta `APPS/NAVEGADOR`**; todo o resto (Neutrino, loja, servidores) fica na TV box e no servidor em nuvem.
 
+## Caminho rápido
+
+1. **Pendrive do PS2:** baixe o [`pendrive.zip`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest/download/pendrive.zip) e descompacte na raiz de um pendrive FAT32.
+2. **Celular:** instale o [`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest/download/InstaladorPS2-publico.apk).
+3. **TV box:** ligue a depuração ADB pela rede. No app: **Procurar TV boxes** → toque na sua → aceite na TV →
+   **Instalar / atualizar tudo**. No fim, o app mostra o IP do PS2; se não for `192.168.4.230`, crie no pendrive o
+   `APPS/NAVEGADOR/IPCONFIG.DAT` com a linha que ele mostrar.
+4. **Cabo:** PS2 na porta de rede da TV box (ou os dois no mesmo roteador).
+5. **PS2:** OPL → **Apps** → **Navegador (rede direta)**.
+
+Opcional — **servidor em nuvem** com a sua coleção: num PC Linux, `servidor/instalar.sh /pasta/da/colecao` e copie o
+endereço e a chave que ele mostrar para o app (**Salvar servidor na TV box**).
+
+O resto desta página é o detalhe de cada passo.
+
 ## Requisitos
 
 | Peça | O que precisa | Para quê |
@@ -58,7 +73,7 @@ boot=navegador.elf
 Sem o `IPCONFIG.DAT`, o PS2 usa `192.168.4.230 / 255.255.255.0 / 192.168.4.1`. Escolha um IP livre na rede da TV box.
 O PS2 não pega IP por DHCP.
 
-O app do celular grava o `navegador.elf` e o `IPCONFIG.DAT` no pendrive com os botões **Gravar navegador.elf no
+O [`pendrive.zip`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest/download/pendrive.zip) já traz a pasta `APPS/NAVEGADOR` pronta. O app do celular também grava o `navegador.elf` e o `IPCONFIG.DAT` no pendrive com os botões **Gravar navegador.elf no
 pendrive do PS2** e **Gravar IP no pendrive do PS2** (com o navegador já aberto no PS2). Na primeira vez, copie pelo PC.
 
 A loja cria sozinha, quando você usa o Super Nintendo:
@@ -74,12 +89,15 @@ APPS/RETROARCH/       ← emulador de SNES, gravado junto com a 1ª ROM
 
 1. Ligue o modo desenvolvedor e a **depuração ADB pela rede** (porta 5555). O app do celular mostra o passo a passo se
    não achar a box.
-2. No celular, abra o `InstaladorPS2.apk` → **Procurar TV boxes** → toque na sua → aceite **Permitir depuração** na TV
+2. No celular, abra o `InstaladorPS2-publico.apk` → **Procurar TV boxes** → toque na sua → aceite **Permitir depuração** na TV
    (marque *Sempre permitir*) → **Instalar / atualizar tudo**.
 3. Precisa de uns **400 MB livres** e de internet na 1ª vez (o Termux baixa o Python).
-4. Em **IP do PS2**, ponha o mesmo IP do `IPCONFIG.DAT` e toque em **Salvar IP na TV box**.
+4. **IP do PS2 automático:** se o IP padrão não for da rede do cabo da box, o instalador escolhe um livre nela e mostra
+   a linha do `IPCONFIG.DAT`. Para trocar à mão: **IP do PS2** → **Salvar IP na TV box**.
+5. **Servidor em nuvem (opcional):** endereço e chave → **Salvar servidor na TV box**.
 
-O instalador põe na box o Termux, o Termux:Boot, o app do navegador (WebView), os servidores e o Neutrino.
+O instalador põe na box o Termux, o Termux:Boot, o app do navegador (WebView), os servidores e o
+[Neutrino](https://github.com/rickgaiser/neutrino) 1.8.0 oficial (licença AFL-3.0, sem modificações).
 
 Jogos que ficam **na própria TV box** (opcional, abrem mais rápido): um pendrive ou HD na USB da box com as pastas
 
@@ -93,14 +111,23 @@ CD/    ← ISOs de CD
 Sem ele, a TV box mostra o menu, os vídeos dela e roda os jogos do pendrive dela. Com ele, entram o catálogo da loja,
 os jogos e vídeos da coleção e o acesso fora de casa.
 
+Num PC Linux com Python 3, na pasta do repositório:
+
+```
+servidor/instalar.sh /pasta/da/colecao [IP_DA_TV_BOX]
+```
+
+Ele cria `DVD/`, `CD/` e `VIDEOS-PS2/` na coleção, liga os serviços (PM2, ou systemd do usuário) e mostra o
+**endereço** e a **chave** para pôr no app do celular. Os ISOs vão em `DVD/` e `CD/`.
+
 | Serviço | Arquivo | Porta | Pasta da coleção |
 | --- | --- | --- | --- |
 | Loja e catálogo | `servidor.py` | 8770 | — |
 | Vídeos, ROMs, ISOs e loja para a TV box | `navegador/videos_https.py` | 8781 | `PS2/DVD`, `PS2/CD`, `PS2/VIDEOS-PS2` (variáveis `PS2_JOGOS` e `PS2_VIDEOS`) |
 | Acesso fora de casa | túnel Cloudflare (`cloudflared`) | → 8781 | — |
 
-Na primeira execução, o `videos_https.py` cria a chave `videos_https.chave`. Ela vai no `config.json` da TV box
-(o `gerar-pacote.sh` do instalador já põe).
+**Fora de casa:** crie um túnel HTTPS (ex.: Cloudflare Tunnel) para a porta 8781 e use o endereço `https://…` no app.
+A chave fica em `navegador/videos_https.chave`.
 
 ## Primeiro uso
 

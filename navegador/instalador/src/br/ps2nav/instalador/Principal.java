@@ -38,7 +38,7 @@ public class Principal extends Activity {
     final Handler ui = new Handler(Looper.getMainLooper());
     final ExecutorService fila = Executors.newSingleThreadExecutor();
     LinearLayout achadas;
-    EditText campoBox, campoIp, campoMascara, campoGw;
+    EditText campoBox, campoIp, campoMascara, campoGw, campoServidor, campoChave;
     TextView log, estado;
     Adb adb;
     Caixa caixa;
@@ -75,6 +75,17 @@ public class Principal extends Activity {
                 escrever("Serviços reiniciando (uns 20 s)…"); caixa.esperar(20000); mostrarEstado(); } }); } });
         estado = texto(raiz, "Estado: conecte numa TV box.");
         estado.setTypeface(Typeface.MONOSPACE);
+
+        titulo(raiz, "Servidor em nuvem (opcional)", 18);
+        texto(raiz, "O PC com a sua coleção (servidor/instalar.sh mostra o endereço e a chave). Sem ele, a TV box "
+                + "mostra só os jogos e vídeos dela.");
+        campoServidor = campo(raiz, "Endereço (ex.: http://192.168.0.10:8781)", "");
+        campoChave = campo(raiz, "Chave", "");
+        botao(raiz, "Salvar servidor na TV box", new Runnable() { public void run() { tarefa(new Tarefa() {
+            public void rodar() throws Exception {
+                caixa.configurarServidor(lido(campoServidor), lido(campoChave));
+                escrever("Servidor salvo. Reiniciando os serviços…");
+                caixa.iniciar(); caixa.esperar(20000); mostrarEstado(); } }); } });
 
         titulo(raiz, "PS2", 18);
         campoIp = campo(raiz, "IP do PS2", "192.168.4.230");

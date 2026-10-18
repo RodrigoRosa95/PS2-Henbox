@@ -10,6 +10,10 @@ PS2 configurável, tela de estado). Fica em ~/ps2nav; config.json ao lado:
   configurar.py ip-ps2    só imprime o IP do PS2 (iniciar.sh)
   configurar.py estado    JSON com o estado da box para o app do celular
   configurar.py ip IP [MÁSCARA GW]   troca o IP do PS2 no config.json e aplica
+  configurar.py ip-auto   (18/10/2026) se o IP do PS2 não é da rede do cabo da box (eth0), escolhe um livre nela
+                          (.230, .231… sem resposta ao ping) com a máscara e o gateway da box; imprime "IP MÁSCARA GW"
+  configurar.py servidor URL CHAVE   endereço do servidor em nuvem (porta 8781, http da rede local ou https) e a chave;
+                          URL vazia = sem servidor (só o que está na box)
 """
 import json, os, re, shutil, socket, subprocess, sys, time
 
@@ -52,6 +56,56 @@ def aplicar():
         if novo != texto:
             gravar(arq, novo)
     return c
+
+
+def rede_eth0():
+    """(ip, prefixo, gateway) do cabo da box, ou None."""
+    try:
+        addr = subprocess.run(['ip', '-4', '-o', 'addr', 'show', 'eth0'], capture_output=True, text=True, timeout=5).stdout
+        m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)/(\d+)', addr)
+        if not m:
+            return None
+        rotas = ''
+        for tab in ('eth0', 'main'):
+            rotas += subprocess.run(['ip', 'route', 'show', 'table', tab], capture_output=True, text=True,
+                                    timeout=5).stdout
+        g = re.search(r'default via (\d+\.\d+\.\d+\.\d+) dev eth0', rotas)
+        return m.group(1), int(m.group(2)), g.group(1) if g else ''
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def ip_auto():
+    import ipaddress
+    c = ler()
+    r = rede_eth0()
+    if not r:
+        return c['ps2']
+    ip_box, prefixo, gw = r
+    rede = ipaddress.ip_network(f'{ip_box}/{prefixo}', strict=False)
+    if ipaddress.ip_address(c['ps2']['ip']) in rede:
+        return c['ps2']
+    base = int(rede.network_address)
+    for fim in list(range(230, 254)) + list(range(200, 230)):
+        cand = str(ipaddress.ip_address(base + fim))
+        if ipaddress.ip_address(cand) not in rede or cand in (ip_box, gw):
+            continue
+        if subprocess.run(['ping', '-c', '1', '-W', '1', cand], capture_output=True).returncode != 0:
+            c['ps2'] = {'ip': cand, 'mascara': str(rede.netmask), 'gw': gw or str(ipaddress.ip_address(base + 1))}
+            gravar(CONFIG, json.dumps(c, ensure_ascii=False, indent=1) + '\n', 0o600)
+            aplicar()
+            break
+    return c['ps2']
+
+
+def servidor(url, chave):
+    c = ler()
+    url = url.strip().rstrip('/')
+    m = re.match(r'^http://([^/:]+):8781$', url)
+    c['notebook'] = {'urls': [url] if url else [], 'chave': chave.strip(),
+                     'casa': f'http://{m.group(1)}:8770' if m else ''}
+    gravar(CONFIG, json.dumps(c, ensure_ascii=False, indent=1) + '\n', 0o600)
+    aplicar()
 
 
 def porta_aberta(host, porta, t=1.0):
@@ -124,6 +178,12 @@ if __name__ == '__main__':
         print('ok')
     elif acao == 'ip-ps2':
         print(ler()['ps2']['ip'])
+    elif acao == 'ip-auto':
+        p = ip_auto()
+        print(p['ip'], p['mascara'], p['gw'])
+    elif acao == 'servidor':
+        servidor(sys.argv[2] if len(sys.argv) > 2 else '', sys.argv[3] if len(sys.argv) > 3 else '')
+        print('ok')
     elif acao == 'ip':
         c = ler()
         c['ps2']['ip'] = sys.argv[2]

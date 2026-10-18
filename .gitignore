@@ -1,5 +1,6 @@
 # segredos e chaves
 *.chave
+servidor/servidor.env
 *.convite
 *.jks
 config.json

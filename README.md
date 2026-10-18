@@ -20,6 +20,13 @@ os jogos da coleção pessoal do autor; nada é baixado pela vitrine. Jogar e ba
 No painel do jogo, **☁ Jogar pela rede** abre o Neutrino no PS2 lendo o ISO direto do HD da coleção, aos pedaços,
 pela TV box (rede local ou HTTPS).
 
+## Baixar
+
+Arquivos prontos na [última Release](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest):
+`pendrive.zip` (pasta `APPS/NAVEGADOR` para o pendrive do PS2) e `InstaladorPS2-publico.apk` (celular: instala tudo na
+TV box, com o [Neutrino](https://github.com/rickgaiser/neutrino) 1.8.0 oficial, AFL-3.0). Passo a passo em
+[Instalação](docs/instalacao.md).
+
 ## Documentação
 
 - [Instalação](docs/instalacao.md) — requisitos e o que vai no memory card, no pendrive do PS2, na TV box e no servidor
@@ -44,6 +51,8 @@ pela TV box (rede local ou HTTPS).
 - PS2 (ps2sdk + gsKit em `/usr/local/ps2dev`): `make -C navegador/navlink && make -C navegador/ps2`
 - App da TV box: `navegador/tvbox-app/montar.sh` (aapt, dx, android-23, apksigner — sem Gradle)
 - Instalador do celular: `navegador/instalador/terceiros/baixar.sh` e `navegador/instalador/montar.sh`
+  (`PUBLICO=1 navegador/instalador/montar.sh` gera o `InstaladorPS2-publico.apk`, sem chave nem endereços)
+- Servidor em nuvem: `servidor/instalar.sh /pasta/da/colecao`
 
 O pacote do instalador também precisa, fora deste repositório: `neutrino/` e `udpfs_server/` (release oficial do
 [Neutrino](https://github.com/rickgaiser/neutrino)), o SNESticle e o SMS em `navegador/ps2/`, e a chave

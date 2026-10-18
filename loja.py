@@ -10,9 +10,10 @@ Cópia: o Samba do Termux é só leitura e o adb push falha no FAT32 (fchown), e
 """
 import hashlib, os, re, socket, subprocess, threading, time
 
-ORIGEM = '/media/rodrigo/01TERA/PS2/DVD'
-TVBOX = '192.168.4.121'
-PEN = '/mnt/media_rw/1E0A-1F18'
+# configurável (servidor/servidor.env, 18/10/2026): pasta da coleção (com DVD/ e CD/), IP da TV box e o pendrive dela
+ORIGEM = os.path.join(os.environ.get('PS2_JOGOS', '/media/rodrigo/01TERA/PS2'), 'DVD')
+TVBOX = os.environ.get('PS2_TVBOX', '192.168.4.121')
+PEN = os.environ.get('PS2_TVBOX_USB', '/mnt/media_rw/1E0A-1F18')
 ADB = ['adb', '-s', f'{TVBOX}:5555', 'shell']
 PORTA_NC = 9771
 FAT32_MAX = 4 * 1024 ** 3 - 1
@@ -65,7 +66,7 @@ def catalogo():
     no_pen, livre, total = pendrive()
     jogos = []
     nomes = set()
-    for arq in sorted(os.listdir(ORIGEM), key=str.lower):
+    for arq in sorted(os.listdir(ORIGEM) if os.path.isdir(ORIGEM) else [], key=str.lower):
         if not arq.lower().endswith('.iso'):
             continue
         caminho = os.path.join(ORIGEM, arq)

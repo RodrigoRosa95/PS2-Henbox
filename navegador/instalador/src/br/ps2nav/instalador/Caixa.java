@@ -164,6 +164,11 @@ public class Caixa {
             if (!suTermux("python3 -c 'import PIL, websocket; print(1)' 2>/dev/null").equals("1"))
                 throw new IOException("Python não ficou pronto (veja ~/instalar-ps2nav.log na box)");
         }
+        String ip = ipAutomatico();
+        log.aviso("IP do PS2: " + ip);
+        if (!ip.startsWith("192.168.4.230 "))
+            log.aviso("Este IP não é o padrão: crie no pendrive do PS2 o arquivo APPS/NAVEGADOR/IPCONFIG.DAT com a linha: "
+                    + ip);
         log.aviso("Liberando o Termux e o navegador para rodar sempre…");
         liberarPermissoes();
         log.aviso("Ligando os servidores…");
@@ -185,6 +190,27 @@ public class Caixa {
         sh("am start -n br.ps2nav/.Inicio");
         esperar(4000);
         rodarNoTermux("iniciar-ps2nav.sh", "exec ~/ps2nav/iniciar.sh");
+    }
+
+    /** Se o IP do PS2 não é da rede do cabo da box, escolhe um livre nela (configurar.py ip-auto); "IP MÁSCARA GW". */
+    String ipAutomatico() throws IOException {
+        if (uidTermux.length() == 0) uidTermux = su("stat -c %u " + T);
+        String r = suTermux("python3 ps2nav/configurar.py ip-auto; chown -R " + uidTermux + ":" + uidTermux + " " + H
+                + "/ps2nav");
+        String[] linhas = r.trim().split("\n");
+        return linhas[linhas.length - 1].trim();
+    }
+
+    /** Endereço do servidor em nuvem (http://IP:8781 em casa, ou https) e a chave; vazio = sem servidor. */
+    void configurarServidor(String url, String chave) throws IOException {
+        url = url.trim();
+        chave = chave.trim();
+        if (url.length() > 0 && !url.matches("https?://[A-Za-z0-9.\\-]+(:\\d+)?/?"))
+            throw new IOException("endereço inválido (ex.: http://192.168.0.10:8781 ou https://meu.dominio)");
+        if (!chave.matches("[A-Za-z0-9_\\-]*")) throw new IOException("chave inválida");
+        if (uidTermux.length() == 0) uidTermux = su("stat -c %u " + T);
+        suTermux("python3 ps2nav/configurar.py servidor " + aspas(url) + " " + aspas(chave) + "; chown -R " + uidTermux
+                + ":" + uidTermux + " " + H + "/ps2nav");
     }
 
     String estado() throws IOException { return suTermux("python3 ps2nav/configurar.py estado 2>&1"); }

@@ -17,7 +17,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 PASTA = os.path.dirname(os.path.abspath(__file__))
 CAPAS = os.path.join(PASTA, 'capas')
 SCRIPT = os.path.expanduser('~/.local/bin/ps2-proximo-jogo.sh')
-TVBOX, PS2_FTP = '192.168.4.121', os.environ.get('PS2_FTP', '192.168.4.230')
+TVBOX, PS2_FTP = os.environ.get('PS2_TVBOX', '192.168.4.121'), os.environ.get('PS2_FTP', '192.168.4.230')
 PS2LINK = PS2_FTP  # PS2Link e wLaunchELF usam o mesmo IP fixo
 _cache = {'t': 0, 'jogos': []}
 _trava = threading.Lock()
