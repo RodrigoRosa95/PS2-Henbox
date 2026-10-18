@@ -12,7 +12,7 @@ A loja de jogos é parecida com a loja da HEN do PS3: você navega pelas capas e
 
 O que dá para fazer hoje:
 
-- **Jogar PS2 pela rede**, direto do HD da coleção, sem copiar o jogo para o pendrive ("☁ Jogar pela rede").
+- **Jogar PS2 pela rede**, direto do servidor em nuvem da coleção, sem copiar o jogo para o pendrive ("☁ Jogar pela rede").
 - **Jogar Super Nintendo**: a loja grava a ROM e o emulador no pendrive do PS2 e abre o jogo.
 - **Assistir vídeos** já preparados para o PS2, da TV box ou da coleção.
 - **Funciona fora de casa**: a TV box busca tudo pela internet, com acesso protegido por chave.
@@ -65,7 +65,7 @@ No vídeo: X ou START pausa, O para e volta ao menu.
 
 **Vídeos**
 
-1. **🎬 Vídeos** mostra os da TV box ("na TV box") e os da coleção ("do notebook").
+1. **🎬 Vídeos** mostra os da TV box ("na TV box") e os da coleção ("do servidor em nuvem").
 2. Escolha e aperte X. No início aparece uma barra azul enquanto o vídeo carrega.
 
 ## Problemas comuns
@@ -85,7 +85,7 @@ No vídeo: X ou START pausa, O para e volta ao menu.
 1. **Minuto 0–1: abertura.** Mostre o PS2 ligado ao lado da TV box e diga a ideia: o PS2 vira uma central de jogos e vídeos, com a TV box fazendo o trabalho pesado.
 2. **Minuto 1–2: entrada.** OPL → Apps → Navegador. Mostre a barra azul virando o menu em poucos segundos.
 3. **Minuto 2–3: loja.** Navegue pelas capas com o analógico, abra um jogo e mostre os detalhes (tamanho, região, onde está).
-4. **Minuto 3–4: jogo pela rede.** Escolha um jogo que não está na TV box e aperte ☁ Jogar pela rede. Explique que ele vem do HD da coleção enquanto carrega.
+4. **Minuto 3–4: jogo pela rede.** Escolha um jogo que não está na TV box e aperte ☁ Jogar pela rede. Explique que ele vem do servidor em nuvem da coleção enquanto carrega.
 5. **Minuto 4–5: fechamento.** Reinicie o PS2, abra Vídeos e toque um trecho. Termine com: tudo isso funciona também fora de casa, pela internet.
 
 Prepare antes: a TV box ligada há 1 minuto, o navegador.elf no pendrive e um jogo escolhido que já tenha aberto pela rede.
