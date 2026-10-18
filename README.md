@@ -1,19 +1,18 @@
 # ps2GamesCLoudinOPl — PS2 Navegador
 
 **Objetivo:** uma loja de jogos online para o PlayStation 2, parecida com a loja da HEN do PS3 — você navega pelas
-capas com o controle e escolhe o jogo. O diferencial é que, além de **baixar** o jogo da loja para o pendrive, dá para
-**rodar o jogo direto em nuvem**: o PS2 abre o jogo lendo o ISO aos pedaços pela rede (em casa ou por HTTPS, fora de
-casa), sem copiar nada.
+capas com o controle do ps2 ou mouse usb e escolhe o jogo. O diferencial é que, além de **baixar** o jogo da loja para o pendrive, dá para
+**rodar o jogo direto em nuvem**: o PS2 abre o jogo lendo o ISO aos pedaços pela rede sem copiar nada.
 
-**Como funciona:** a loja roda no navegador (Chrome/WebView) de uma **TV box Android** ligada ao PS2 por cabo de rede.
+**Como funciona:** a loja roda no navegador (Chrome/WebView) de uma **TV box Android** na mesma rede interna do PS2.
 O PS2 se conecta a esse navegador **como numa conexão remota VNC**: a TV box desenha a página e manda a imagem pronta
-para o PS2, que só mostra a tela e devolve os botões do controle. Quando você escolhe **☁ Jogar pela rede**, o PS2 abre
-o [Neutrino](https://github.com/rickgaiser/neutrino) e a TV box serve o jogo da coleção enquanto você joga.
+para o PS2, que só mostra a tela e devolve os comandos dos botões do controle. Quando você escolhe **☁ Jogar pela rede**, o PS2 abre
+o [Neutrino](https://github.com/rickgaiser/neutrino) e a TV box serve o jogo da coleção em tempo real por streaming.
 
 ![Arquitetura](docs/arquitetura.png)
 
-**Veja a loja ao vivo:** [vitrine da loja (só para olhar)](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb). São
-os jogos da coleção pessoal do autor; nada é baixado pela vitrine. Jogar e baixar funcionam só no PS2, pela TV box.
+**Veja o link demonstratibo de loja:** [(apenas visualização)](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb). São
+os jogos da coleção pessoal do autor; nada é baixado nesse link demonstrativo. Jogar e baixar funcionam apenas no PS2.
 
 ## Telas (como aparecem no PS2, 640x448)
 
@@ -23,8 +22,8 @@ os jogos da coleção pessoal do autor; nada é baixado pela vitrine. Jogar e ba
 | **Jogo pela rede** | **Vídeos** |
 | ![Jogar pela rede](docs/telas/3-jogar-pela-rede.png) | ![Vídeos](docs/telas/4-videos.png) |
 
-No painel do jogo, **☁ Jogar pela rede** abre o Neutrino no PS2 lendo o ISO direto do HD da coleção, aos pedaços,
-pela TV box (rede local ou HTTPS).
+No painel do jogo, **☁ Jogar pela rede** abre o Neutrino no PS2 lendo a ISO direto do servidor em nuvem da coleção, aos pedaços,
+atraves da TV box em HTTPS.
 
 ## Baixar
 
