@@ -218,7 +218,7 @@ function detalheSnes(j, manterMsg) {
     $('dprogbarra').style.width = (p.pct || 0) + '%';
   }
   if (!ocupado && p.ok && p.op === 1) $('dmsg').textContent = '▶ Abrindo no SNESticle do pendrive…';
-  else if (!ocupado && p.ok && p.op === 0) $('dmsg').textContent = '✔ No pendrive (SNES/). ▶ Jogar abre no SNESticle; sem o notebook: OPL → Apps → SNESticle (SNES).';
+  else if (!ocupado && p.ok && p.op === 0) $('dmsg').textContent = '✔ No pendrive (SNES/). ▶ Jogar abre no SNESticle; sem o servidor em nuvem: OPL → Apps → SNESticle (SNES).';
   else if (!ocupado && p.estado && !p.ok) $('dmsg').textContent = '⚠ ' + (p.estado === 'pendrive não encontrado no PS2 (ou sem espaço)' && p.op === 1
       ? 'a ROM não está no pendrive do PS2: baixe primeiro' : p.estado === 'erro lendo a ROM do notebook' && p.op === 1
       ? 'o SNESticle não está no pendrive: baixe a ROM primeiro (ele vai junto)' : p.estado);
@@ -229,7 +229,7 @@ function detalheRetro(manterMsg) {
   const p = retro.pedido || {}, ocupado = !!p.andamento;
   $('dcapa').outerHTML = capaHtml(retro).replace('class="capa"', 'class="capa" id="dcapa"');
   $('dnome').textContent = 'SNESticle — Super Nintendo';
-  $('dlinhas').innerHTML = [['O que é', 'SNESticle Revive (GPLv3) com a ROM direto e DualShock 4 por Bluetooth'], ['Versão no notebook', retro.versao || '—'],
+  $('dlinhas').innerHTML = [['O que é', 'SNESticle Revive (GPLv3) com a ROM direto e DualShock 4 por Bluetooth'], ['Versão no servidor em nuvem', retro.versao || '—'],
     ['Tamanho', gb(retro.tamanho || 0)], ['No pendrive do PS2', 'APPS/SNESTICLE (aparece no OPL → Apps)'],
     ['Na TV box', retro.na_tvbox ? 'instalado em APPS/SNESTICLE (OPL → Apps pelo Samba)' : 'não'],
     ['Passos', '1 instalar · 2 baixar jogos · 3 ▶ Jogar']]

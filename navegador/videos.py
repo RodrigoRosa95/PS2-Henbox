@@ -16,6 +16,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 PASTA = os.path.dirname(os.path.abspath(__file__))
 VIDEOS = os.path.join(PASTA, 'ps2', 'video')
 LOJA = '/loja/loja.html'
+# o Cloudflare (Browser Integrity Check) barra o "Python-urllib" com erro 1010: nome próprio nos pedidos (18/10/2026)
+UA = 'ps2nav/1.0'
 SNES = os.path.join(PASTA, 'ps2', 'snes')
 PORTA = int(sys.argv[1]) if len(sys.argv) > 1 else 8780
 
@@ -54,7 +56,7 @@ def lista_remota():
         cfg = json.load(open(os.path.join(PASTA, 'remoto.json')))
         for url in sorted(cfg['urls'], key=lambda u: u != _url_boa[0]):
             try:
-                req = urllib.request.Request(url.rstrip('/') + '/lista', headers={'X-Chave': cfg['chave']})
+                req = urllib.request.Request(url.rstrip('/') + '/lista', headers={'X-Chave': cfg['chave'], 'User-Agent': UA})
                 vs = json.load(urllib.request.urlopen(req, timeout=3 if url.startswith('http:') else 10))
                 _url_boa[0] = url
                 break
@@ -84,7 +86,7 @@ def remoto(caminho, timeout=15):
     erro = None
     for url in urls:
         try:
-            req = urllib.request.Request(url.rstrip('/') + caminho, headers={'X-Chave': c.get('chave', '')})
+            req = urllib.request.Request(url.rstrip('/') + caminho, headers={'X-Chave': c.get('chave', ''), 'User-Agent': UA})
             curto = url.startswith('http:') and url != _url_boa[0]   # rede local ainda não testada: desiste logo
             with urllib.request.urlopen(req, timeout=3 if curto else timeout) as r:
                 _url_boa[0] = url
@@ -93,7 +95,7 @@ def remoto(caminho, timeout=15):
             return e.code, 'application/json', e.read()
         except Exception as e:
             erro = e
-    return 502, 'application/json', json.dumps({'erro': f'notebook fora do alcance ({erro})'}).encode()
+    return 502, 'application/json', json.dumps({'erro': f'servidor em nuvem fora do alcance ({erro})'}).encode()
 
 
 def navegador(pedido):
@@ -170,7 +172,7 @@ class H(BaseHTTPRequestHandler):
             if not os.path.isfile(os.path.join(SNES, arq)):   # baixa do notebook antes de gravar no PS2
                 st, _, d = remoto('/rom/' + urllib.parse.quote(arq), timeout=60)
                 if st != 200:
-                    return self.json({'ok': False, 'msg': 'não consegui baixar a ROM do notebook'})
+                    return self.json({'ok': False, 'msg': 'não consegui baixar a ROM do servidor em nuvem'})
                 os.makedirs(SNES, exist_ok=True)
                 with open(os.path.join(SNES, arq + '.tmp'), 'wb') as f:
                     f.write(d)
@@ -190,12 +192,12 @@ class H(BaseHTTPRequestHandler):
         if casa and acao.startswith('api/'):
             try:
                 req = urllib.request.Request(casa.rstrip('/') + '/' + acao, data=json.dumps(corpo).encode(),
-                                             headers={'Content-Type': 'application/json'})
+                                             headers={'Content-Type': 'application/json', 'User-Agent': UA})
                 with urllib.request.urlopen(req, timeout=60) as r:
                     return self.json(json.loads(r.read()))
             except Exception:
                 pass
-        return self.json({'ok': False, 'msg': 'Disponível só em casa (com o notebook na mesma rede).'})
+        return self.json({'ok': False, 'msg': 'Disponível só em casa (com o servidor em nuvem na mesma rede).'})
 
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
@@ -219,7 +221,7 @@ class H(BaseHTTPRequestHandler):
             itens = ''.join(f'<a class="b" href="/tocar?id={urllib.parse.quote(v["id"])}">{html.escape(v["titulo"])}'
                             f'<div class="p">{v["mb"]} MB · na TV box</div></a>' for v in lista())
             itens += ''.join(f'<a class="b" href="/tocar?id=remoto/{urllib.parse.quote(v["id"])}">'
-                             f'{html.escape(v["titulo"])}<div class="p">{v["mb"]} MB · do notebook</div></a>'
+                             f'{html.escape(v["titulo"])}<div class="p">{v["mb"]} MB · do servidor em nuvem</div></a>'
                              for v in lista_remota())
             self.pagina('<h1>🎬 Vídeos</h1><div class="lista"><a class="b" href="/">← Voltar</a>'
                         + (itens or '<div class="msg">Nenhum vídeo em ps2/video na TV box.</div>') + '</div>')
