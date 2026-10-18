@@ -1,8 +1,14 @@
 # ps2GamesCLoudinOPl — PS2 Navegador
 
-Transforma o PlayStation 2 numa central de jogos e vídeos controlada pelo controle: uma **TV box Android** desenha as
-páginas (loja, vídeos) num WebView e manda a imagem ao PS2, que só mostra e devolve o controle. Os jogos de PS2 podem
-rodar **pela rede**, lidos aos pedaços do HD da coleção enquanto você joga, inclusive fora de casa (HTTPS).
+**Objetivo:** uma loja de jogos online para o PlayStation 2, parecida com a loja da HEN do PS3 — você navega pelas
+capas com o controle e escolhe o jogo. O diferencial é que, além de **baixar** o jogo da loja para o pendrive, dá para
+**rodar o jogo direto em nuvem**: o PS2 abre o jogo lendo o ISO aos pedaços pela rede (em casa ou por HTTPS, fora de
+casa), sem copiar nada.
+
+**Como funciona:** a loja roda no navegador (Chrome/WebView) de uma **TV box Android** ligada ao PS2 por cabo de rede.
+O PS2 se conecta a esse navegador **como numa conexão remota VNC**: a TV box desenha a página e manda a imagem pronta
+para o PS2, que só mostra a tela e devolve os botões do controle. Quando você escolhe **☁ Jogar pela rede**, o PS2 abre
+o [Neutrino](https://github.com/rickgaiser/neutrino) e a TV box serve o jogo da coleção enquanto você joga.
 
 ![Arquitetura](docs/arquitetura.png)
 
