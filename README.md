@@ -22,8 +22,9 @@ pela TV box (rede local ou HTTPS).
 
 ## Baixar
 
-Arquivos prontos na [última Release](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest):
-`pendrive.zip` (pasta `APPS/NAVEGADOR` para o pendrive do PS2) e `InstaladorPS2-publico.apk` (celular: instala tudo na
+Arquivos prontos (pasta [`downloads/`](downloads/), também na [Release](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest)):
+[`pendrive.zip`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/raw/main/downloads/pendrive.zip) (pasta `APPS/NAVEGADOR` para o pendrive do PS2) e
+[`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/raw/main/downloads/InstaladorPS2-publico.apk) (no celular ou na própria TV box: instala tudo na
 TV box, com o [Neutrino](https://github.com/rickgaiser/neutrino) 1.8.0 oficial, AFL-3.0). Passo a passo em
 [Instalação](docs/instalacao.md).
 
