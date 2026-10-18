@@ -1,13 +1,15 @@
 # ps2GamesCLoudinOPl — PS2 Navegador
 
-**Objetivo:** uma loja de jogos online para o PlayStation 2, parecida com a loja da HEN do PS3 — você navega pelas
-capas com o controle do ps2 ou mouse usb e escolhe o jogo. O diferencial é que, além de **baixar** o jogo da loja para o pendrive, dá para
-**rodar o jogo direto em nuvem**: o PS2 abre o jogo lendo o ISO aos pedaços pela rede sem copiar nada.
+O projeto ps2GamesCLoudinOPl é uma solução criativa que transforma o seu PlayStation 2 em um console capaz de acessar uma loja de jogos online e até mesmo executar jogos diretamente da nuvem, sem a necessidade de baixá-los completamente para um pendrive ou HD.
 
-**Como funciona:** a loja roda no navegador (Chrome/WebView) de uma **TV box Android** na mesma rede interna do PS2.
-O PS2 se conecta a esse navegador **como numa conexão remota VNC**: a TV box desenha a página e manda a imagem pronta
-para o PS2, que só mostra a tela e devolve os comandos dos botões do controle. Quando você escolhe **☁ Jogar pela rede**, o PS2 abre
-o [Neutrino](https://github.com/rickgaiser/neutrino) e a TV box serve o jogo da coleção em tempo real por streaming.
+🎮 Entendendo o Projeto: A Arquitetura da Nuvem no PS2
+A magia acontece através da cooperação entre três dispositivos principais, cada um com uma função bem definida:
+
+PlayStation 2 (Cliente Magro): O PS2 não faz o trabalho pesado. Ele apenas exibe a imagem que recebe e envia os comandos do controle de volta. Ele se conecta à TV box através de rede.
+
+TV Box Android (O Cérebro): Este é o coração do sistema. A TV box é responsável por renderizar a interface da loja (que você vê no PS2), gerenciar os arquivos e servir os jogos. Ela "desenha" a página e envia a imagem pronta para o PS2, como se fosse uma conexão remota.
+
+
 
 ![Arquitetura](docs/arquitetura.png)
 
