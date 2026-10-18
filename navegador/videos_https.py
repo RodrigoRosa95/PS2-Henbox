@@ -12,8 +12,10 @@ http://192.168.4.135:8781; fora de casa, https://ps2videos.rodrigoflix.com (tún
                                  enquanto o PS2 joga ("jogo em nuvem")
 As ações da loja (gravar no pendrive, jogar) NÃO passam por aqui: quem executa é a TV box que está com o PS2.
 Chave no cabeçalho "X-Chave" (arquivo videos_https.chave, criado na primeira vez).
+Loja num navegador comum (18/10/2026, só olhar): abrir uma vez /loja/?chave=<chave> grava um cookie que libera só os
+caminhos de leitura da loja (/loja/*) — não vale para vídeos, ROMs nem ISOs — e volta para /loja/loja.html sem a chave.
 """
-import json, os, re, secrets, sys, urllib.error, urllib.parse, urllib.request
+import hashlib, hmac, json, os, re, secrets, sys, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PASTA = os.environ.get('PS2_VIDEOS', '/media/rodrigo/01TERA/PS2/VIDEOS-PS2')
@@ -29,6 +31,8 @@ if not os.path.exists(ARQ_CHAVE):
     with open(os.open(ARQ_CHAVE, os.O_WRONLY | os.O_CREAT, 0o600), 'w') as f:
         f.write(secrets.token_urlsafe(32))
 CHAVE = open(ARQ_CHAVE).read().strip()
+# cookie do navegador: derivado da chave, só para a loja (quem pegar o cookie não baixa vídeo, ROM nem ISO)
+COOKIE_LOJA = hmac.new(CHAVE.encode(), b'loja-navegador', hashlib.sha256).hexdigest()
 
 
 def lista():
@@ -61,7 +65,29 @@ class H(BaseHTTPRequestHandler):
         if self.command != 'HEAD':
             self.wfile.write(dados)
 
+    def cookie_loja(self):
+        for parte in self.headers.get('Cookie', '').split(';'):
+            nome, _, valor = parte.strip().partition('=')
+            if nome == 'loja' and secrets.compare_digest(valor, COOKIE_LOJA):
+                return True
+        return False
+
+    def entrar_loja(self):
+        """/loja/ ou /loja/?chave=…: confere a chave, grava o cookie e manda para a loja (a chave sai da barra)."""
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+        if secrets.compare_digest(q.get('chave', [''])[0], CHAVE):
+            return self.responder(303, extra={'Location': '/loja/loja.html', 'Cache-Control': 'no-store',
+                                              'Set-Cookie': f'loja={COOKIE_LOJA}; Path=/loja/; Max-Age=31536000; '
+                                                            'Secure; HttpOnly; SameSite=Strict'})
+        if self.cookie_loja():
+            return self.responder(303, extra={'Location': '/loja/loja.html'})
+        return self.responder(403, 'Abra uma vez /loja/?chave=… com a chave da TV box.'.encode(), 'text/plain; charset=utf-8')
+
     def tratar(self):
+        if self.path == '/loja/' or self.path.startswith('/loja/?'):
+            return self.entrar_loja()
+        if self.path.startswith('/loja/') and self.command in ('GET', 'HEAD') and self.cookie_loja():
+            return self.loja(self.path[len('/loja/'):].split('?')[0])
         if not secrets.compare_digest(self.headers.get('X-Chave', ''), CHAVE):
             return self.responder(403, b'{"erro": "chave"}')
         if self.path == '/lista':
