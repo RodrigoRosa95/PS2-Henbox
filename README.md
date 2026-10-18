@@ -6,6 +6,19 @@ rodar **pela rede**, lidos aos pedaços do HD da coleção enquanto você joga, 
 
 ![Arquitetura](docs/arquitetura.png)
 
+## Telas (como aparecem no PS2, 640x448)
+
+| Menu | Loja |
+| --- | --- |
+| ![Menu inicial](docs/telas/1-menu.png) | ![Loja](docs/telas/2-loja.png) |
+| **Jogo pela rede** | **Vídeos** |
+| ![Jogar pela rede](docs/telas/3-jogar-pela-rede.png) | ![Vídeos](docs/telas/4-videos.png) |
+
+No painel do jogo, **☁ Jogar pela rede** abre o Neutrino no PS2 lendo o ISO direto do HD da coleção, aos pedaços,
+pela TV box (rede local ou HTTPS).
+
+## Documentação
+
 - [Fluxo técnico do sistema](docs/fluxo-tecnico.md) — peças, portas, protocolos, fluxos e problemas resolvidos
 - [Guia para novo usuário](docs/guia-novo-usuario.md) — uso, controles, problemas comuns e roteiro de apresentação
 
