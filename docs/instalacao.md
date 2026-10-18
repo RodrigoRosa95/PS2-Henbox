@@ -12,8 +12,10 @@ só precisa da pasta `APPS/NAVEGADOR`**; todo o resto (Neutrino, loja, servidore
      `adb install`). Abra **Instalador PS2** no launcher da TV → **Instalar NESTA TV box** (aceite o pedido de root)
      → **Instalar / atualizar tudo**. Não precisa de celular nem de ADB pela rede.
    - **Pelo celular:** ligue a depuração ADB pela rede na box. No app do celular: **Procurar TV boxes** → toque na
-     sua → aceite na TV → **Instalar / atualizar tudo**. No fim, o app mostra o IP do PS2; se não for `192.168.4.230`, crie no pendrive o
-   `APPS/NAVEGADOR/IPCONFIG.DAT` com a linha que ele mostrar.
+     sua → aceite na TV → **Instalar / atualizar tudo**.
+
+   No fim, o app mostra o IP do PS2; se não for `192.168.4.230`, crie no pendrive o `APPS/NAVEGADOR/IPCONFIG.DAT` com
+   a linha que ele mostrar.
 4. **Cabo:** PS2 na porta de rede da TV box (ou os dois no mesmo roteador).
 5. **PS2:** OPL → **Apps** → **Navegador (rede direta)**.
 
