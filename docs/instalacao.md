@@ -135,6 +135,41 @@ Ele cria `DVD/`, `CD/` e `VIDEOS-PS2/` na coleção, liga os serviços (PM2, ou 
 **Fora de casa:** crie um túnel HTTPS (ex.: Cloudflare Tunnel) para a porta 8781 e use o endereço `https://…` no app.
 A chave fica em `navegador/videos_https.chave`.
 
+### Exemplo: o servidor do autor
+
+É assim que o servidor do autor está montado. Troque o domínio e a chave pelos seus: a chave dá acesso a todos os
+jogos da coleção, por isso a de verdade não vai aqui.
+
+1. Coleção num HD do PC: `/media/rodrigo/01TERA/PS2` com `DVD/`, `CD/` e `VIDEOS-PS2/`.
+2. No PC:
+
+   ```
+   servidor/instalar.sh /media/rodrigo/01TERA/PS2 192.168.4.121
+   ```
+
+   (`192.168.4.121` é o IP da TV box; ele mostra no fim `Endereço: http://192.168.4.135:8781` e a chave.)
+3. Túnel Cloudflare para usar fora de casa, em `/etc/cloudflared/config.yml` (antes da regra final `http_status:404`):
+
+   ```
+   ingress:
+     - hostname: ps2videos.seu-dominio.com
+       service: http://localhost:8781
+     - service: http_status:404
+   ```
+
+   e um registro DNS para o túnel: `cloudflared tunnel route dns <nome-do-tunel> ps2videos.seu-dominio.com`.
+4. No app (celular ou TV box), em **Servidor em nuvem**:
+
+   | Campo | Em casa | Fora de casa |
+   | --- | --- | --- |
+   | Endereço | `http://192.168.4.135:8781` | `https://ps2videos.seu-dominio.com` |
+   | Chave | a do `videos_https.chave` | a mesma |
+
+   → **Salvar servidor na TV box**. Em casa a box usa a rede local; se não alcançar, o HTTPS.
+
+Para ver como a loja fica com uma coleção de verdade, abra a
+[vitrine da loja do autor](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb) (só para olhar).
+
 ## Primeiro uso
 
 1. TV box ligada há 1 minuto.
