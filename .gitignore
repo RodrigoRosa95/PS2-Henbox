@@ -1,0 +1,30 @@
+# segredos e chaves
+*.chave
+*.jks
+config.json
+remoto.json
+# gerados
+*.o
+*_irx.c
+*.elf
+*.irx
+!navegador/ps2/opl-ds34bt/ds34bt.irx
+*.apk
+navegador/instalador/assets/
+obj/
+sai/
+__pycache__/
+*.log
+# conteúdo (jogos, ROMs, vídeos, capas) e binários de terceiros: fora do repositório
+neutrino/
+udpfs_server/
+navegador/ps2/snes/
+navegador/ps2/sms/
+navegador/ps2/snesticle/
+navegador/ps2/video/
+capas/
+*.iso
+*.smc
+*.sfc
+*.m2v
+*.pcm

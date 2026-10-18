@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PS2 + TV Box</title>
+<style>
+  :root { --fundo:#0d1117; --cartao:#161b22; --borda:#30363d; --texto:#e6edf3; --fraco:#8b949e;
+          --verde:#3fb950; --vermelho:#f85149; --amarelo:#d29922; --azul:#2f81f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--texto); font:15px/1.4 system-ui, sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:300px 1fr; }
+  @media (max-width:720px) { main { grid-template-columns:1fr; } }
+  h1 { grid-column:1/-1; margin:0; font-size:20px; display:flex; justify-content:space-between; align-items:center; }
+  h1 small { color:var(--fraco); font-weight:400; font-size:13px; }
+  .cartao { background:var(--cartao); border:1px solid var(--borda); border-radius:10px; padding:16px; }
+  .capa { width:100%; aspect-ratio:7/10; border-radius:8px; background:#21262d center/cover no-repeat;
+          display:flex; align-items:center; justify-content:center; color:var(--fraco); font-size:56px;
+          box-shadow:0 8px 24px #0008; transition:background-image .3s; }
+  .jogo { font-size:22px; font-weight:600; margin:12px 0 2px; }
+  .id { color:var(--fraco); font-size:13px; }
+  .linha { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--borda); }
+  .linha:last-child { border:0; }
+  .linha span:first-child { color:var(--fraco); }
+  .tag { padding:2px 8px; border-radius:20px; font-size:12px; font-weight:600; }
+  .ok { background:#23863633; color:var(--verde); } .ruim { background:#da363333; color:var(--vermelho); }
+  .aviso { background:#9e6a0333; color:var(--amarelo); }
+  .barra { height:10px; background:#21262d; border-radius:5px; overflow:hidden; margin-top:6px; }
+  .barra div { height:100%; background:linear-gradient(90deg,var(--azul),var(--verde)); width:0; transition:width .5s; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.05em; color:var(--fraco); margin:0 0 8px; }
+  .lado { display:grid; gap:16px; align-content:start; }
+  .proximo { grid-column:1/-1; }
+  .proximo p { margin:0 0 12px; color:var(--fraco); }
+  .grade { display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:12px; }
+  .item { background:none; border:2px solid transparent; border-radius:8px; padding:4px; cursor:pointer; color:var(--texto);
+          text-align:center; font:inherit; font-size:12px; }
+  .item:hover { border-color:var(--borda); }
+  .item:disabled { cursor:not-allowed; opacity:.55; }
+  .item.marcado { border-color:var(--verde); background:#23863622; }
+  .item .mini { aspect-ratio:7/10; border-radius:6px; background:#21262d center/cover no-repeat; margin-bottom:6px;
+                display:flex; align-items:center; justify-content:center; font-size:28px; color:var(--fraco); }
+  #msg { min-height:1.4em; margin-top:10px; }
+  .acoes { display:flex; gap:4px; margin-top:6px; }
+  .acao { flex:1; padding:5px 2px; border-radius:5px; border:1px solid var(--borda); background:#21262d; color:var(--texto);
+          font:inherit; font-size:11px; cursor:pointer; }
+  .acao:hover:not(:disabled) { border-color:var(--azul); }
+  .acao:disabled { opacity:.4; cursor:not-allowed; }
+  .acao.jogar { background:#1f6feb33; }
+  .sis { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .sis button { flex:1; padding:8px; border-radius:6px; border:1px solid var(--borda); background:#21262d; color:var(--texto);
+                font:inherit; font-size:13px; cursor:pointer; }
+  .sis button:hover { border-color:var(--azul); }
+  .sis button.confirmar { border-color:var(--vermelho); background:#da363333; }
+  #sismsg { font-size:13px; min-height:1.2em; margin-top:6px; color:var(--fraco); }
+  .estat { grid-column:1/-1; }
+  .numeros { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; text-align:center; }
+  .numeros div { background:#21262d; border-radius:8px; padding:10px 4px; }
+  .numeros b { display:block; font-size:22px; }
+  .numeros span { color:var(--fraco); font-size:12px; }
+  .rank { display:grid; grid-template-columns:36px 1fr auto; gap:4px 10px; align-items:center; margin-bottom:8px; }
+  .rank .mini2 { width:36px; aspect-ratio:7/10; border-radius:4px; background:#21262d center/cover no-repeat; grid-row:span 2; }
+  .rank .nome { font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rank .tempo { color:var(--fraco); font-size:12px; text-align:right; grid-row:span 2; }
+  .rank .barra { margin:0; height:6px; }
+  .duas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:720px) { .duas { grid-template-columns:1fr; } }
+  .sessao { display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid var(--borda); font-size:13px; }
+  .sessao span:last-child { color:var(--fraco); white-space:nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎮 PS2 + TV Box <small><a href="loja.html" style="color:#58a6ff;margin-right:10px">🛒 Loja de jogos</a><span id="hora">—</span><span id="ps2temp" hidden style="font-size:12px;margin-left:10px;white-space:nowrap"></span></small></h1>
+  <div class="cartao">
+    <div class="capa" id="capa">🎮</div>
+    <div class="jogo" id="jogo">Nenhum jogo aberto</div>
+    <div class="id" id="jogoid">&nbsp;</div>
+  </div>
+  <div class="lado">
+    <div class="cartao">
+      <h2>PS2</h2>
+      <div class="linha"><span>Status</span><span id="ps2st">—</span></div>
+      <div class="linha"><span>OPL → TV box</span><span id="ps2con">—</span></div>
+      <div class="linha"><span>Leitura</span><span id="vel">—</span></div>
+      <div class="barra"><div id="barra"></div></div>
+      <div class="sis">
+        <button data-sis="reiniciar">🔄 Reiniciar PS2</button>
+        <button data-sis="desligar">⏻ Desligar PS2</button>
+        <button data-sis="navegador">🌐 Navegador</button>
+        <button data-sis="loja">🛒 Iniciar loja</button>
+        <button data-sis="cinema">🎬 Cinema</button>
+        <button data-sis="loja-nativa">🛒 Loja nativa</button>
+      </div>
+      <div id="sismsg">Funciona com o PS2 no PS2Link.</div>
+    </div>
+    <div class="cartao">
+      <h2>TV Box</h2>
+      <div class="linha"><span>Status</span><span id="tvst">—</span></div>
+      <div class="linha"><span>Ligada há</span><span id="tvup">—</span></div>
+      <div class="linha"><span>CPU</span><span id="tvcpu">—</span></div>
+      <div class="linha"><span>RAM livre</span><span id="tvram">—</span></div>
+      <div class="linha"><span>Pendrive</span><span id="tvusb">—</span></div>
+      <div class="linha"><span>Samba [PS2]</span><span id="tvsmb">—</span></div>
+    </div>
+  </div>
+  <div class="cartao proximo">
+    <h2>Próximo jogo do OPL</h2>
+    <p id="ftpst">—</p>
+    <div class="grade" id="grade"></div>
+    <div id="msg"></div>
+  </div>
+  <div class="cartao estat">
+    <h2>Estatísticas</h2>
+    <div class="numeros">
+      <div><b id="eshoje">—</b><span>hoje</span></div>
+      <div><b id="essemana">—</b><span>esta semana</span></div>
+      <div><b id="estotal">—</b><span>total</span></div>
+    </div>
+    <div class="duas">
+      <div><h2>Mais jogados</h2><div id="ranking"></div></div>
+      <div><h2>Últimas sessões</h2><div id="recentes"></div></div>
+    </div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const tag = (cls, txt) => `<span class="tag ${cls}">${txt}</span>`;
+const vel = (b) => b >= 1048576 ? (b/1048576).toFixed(2)+' MB/s' : Math.round(b/1024)+' KB/s';
+const tam = (k) => k >= 1048576 ? (k/1048576).toFixed(1)+' GB' : Math.round(k/1024)+' MB';
+const dur = (s) => `${Math.floor(s/3600)}h${String(Math.floor(s%3600/60)).padStart(2,'0')}m`;
+let capaAtual = '';
+async function atualizar() {
+  try {
+    const d = await (await fetch('status.json?t=' + Date.now(), {cache:'no-store'})).json();
+    const p = d.ps2, t = d.tvbox;
+    $('hora').textContent = 'atualizado ' + d.hora;
+    $('ps2st').innerHTML = p.online ? tag('ok','ONLINE') + ` ${p.ip} · ${p.ping_ms} ms` : tag('ruim','SEM RESPOSTA');
+    $('ps2con').innerHTML = p.conectado ? tag('ok','CONECTADO') + ' há ' + dur(p.conectado_ha_s) : tag('aviso','não conectado');
+    $('vel').textContent = vel(p.leitura_bps) + ' · pico ' + vel(p.pico_bps);
+    $('barra').style.width = Math.min(100, p.leitura_bps / (1500*1024) * 100) + '%';
+    $('jogo').textContent = p.jogo || 'Nenhum jogo aberto';
+    $('jogoid').textContent = p.jogo ? (p.jogo_aberto ? '▶ jogando agora · ' : 'último jogo · ') + (p.jogo_id || '') : ' ';
+    if (p.capa !== capaAtual) {
+      capaAtual = p.capa;
+      $('capa').style.backgroundImage = p.capa ? `url("${p.capa}")` : '';
+      $('capa').textContent = p.capa ? '' : '🎮';
+    }
+    $('tvst').innerHTML = t.online ? tag('ok','ONLINE') + ` cabo ${t.cabo || '—'}` : tag('ruim','SEM RESPOSTA');
+    $('tvup').textContent = dur(t.ligada_s);
+    $('tvcpu').innerHTML = (t.temp_c >= 75 ? tag('ruim', t.temp_c+'°C') : tag('ok', t.temp_c+'°C')) + ` carga ${t.carga} · ${t.modo}`;
+    $('tvram').textContent = tam(t.ram_livre_kb);
+    $('tvusb').textContent = `${tam(t.usb_livre_kb)} livres de ${tam(t.usb_total_kb)}`;
+    $('tvsmb').innerHTML = t.samba ? tag('ok','NO AR') : tag('ruim','PARADO');
+  } catch (e) {
+    $('hora').textContent = 'sem dados — o monitor do terminal está aberto?';
+  }
+}
+atualizar(); setInterval(atualizar, 2000);
+
+// ---- Próximo jogo (mc0:/OPL/conf_last.cfg pelo FTP do wLaunchELF) ----
+let jogos = [], marcado = '', ftp = false;
+function desenharGrade() {
+  $('grade').innerHTML = jogos.map(j => `
+    <div class="item ${j.id === marcado ? 'marcado' : ''}" title="${j.nome}">
+      <div class="mini" style="${j.capa ? `background-image:url('${j.capa}')` : ''}">${j.capa ? '' : '🎮'}</div>
+      ${j.nome}${j.id === marcado ? '<br><b>✔ próximo</b>' : ''}
+      <div class="acoes">
+        <button class="acao" data-acao="proximo" data-id="${j.id}" ${ftp ? '' : 'disabled'} title="PS2 no wLaunchELF (FTP)">⏭ Próximo</button>
+        <button class="acao jogar" data-acao="jogar" data-id="${j.id}" title="PS2 no PS2Link">▶ Jogar</button>
+      </div>
+    </div>`).join('');
+}
+async function carregarProximo() {
+  try {
+    const r = await (await fetch('api/proximo', {cache:'no-store'})).json();
+    ftp = r.ftp; if (r.ftp) marcado = r.id;
+    $('ftpst').innerHTML = ftp
+      ? tag('ok','FTP DO PS2 NO AR') + ' ⏭ Próximo grava o jogo no memory card; depois abra o OPL e ele inicia sozinho em 9 s. ▶ Jogar abre na hora (PS2 no PS2Link).'
+      : tag('aviso','FTP DO PS2 FORA DO AR') + ' ⏭ Próximo precisa do wLaunchELF com FTP. ▶ Jogar precisa do PS2Link aberto (OPL → Apps → PS2Link).';
+  } catch (e) { ftp = false; }
+  desenharGrade();
+}
+async function carregarJogos() {
+  try { jogos = await (await fetch('api/jogos', {cache:'no-store'})).json(); } catch (e) {}
+  desenharGrade();
+}
+$('grade').addEventListener('click', async (ev) => {
+  const b = ev.target.closest('.acao'); if (!b || b.disabled) return;
+  const jogar = b.dataset.acao === 'jogar';
+  $('msg').textContent = jogar ? 'Mandando o PS2 abrir o jogo…' : 'Gravando no memory card…';
+  const r = await (await fetch(jogar ? 'api/jogar' : 'api/proximo', {method:'POST', headers:{'Content-Type':'application/json'},
+                                               body: JSON.stringify({id: b.dataset.id})})).json();
+  $('msg').innerHTML = r.ok ? tag('ok','OK') + ' ' + r.msg : tag('ruim','ERRO') + ' ' + r.msg;
+  await carregarProximo();
+});
+// ---- Reiniciar / desligar (ps2client reset / poweroff pelo PS2Link) ----
+let confirmando = null;
+document.querySelector('.sis').addEventListener('click', async (ev) => {
+  const b = ev.target.closest('button'); if (!b) return;
+  const acao = b.dataset.sis;
+  if (['reiniciar', 'desligar'].includes(acao) && confirmando !== acao) {   // primeiro toque só pede confirmação
+    document.querySelectorAll('.sis button').forEach(x => x.classList.remove('confirmar'));
+    b.classList.add('confirmar'); confirmando = acao;
+    $('sismsg').textContent = `Toque de novo para ${acao} o PS2.`;
+    setTimeout(() => { if (confirmando === acao) { confirmando = null; b.classList.remove('confirmar');
+      $('sismsg').textContent = 'Funciona com o PS2 no PS2Link.'; } }, 5000);
+    return;
+  }
+  confirmando = null; b.classList.remove('confirmar');
+  $('sismsg').textContent = acao === 'loja' || acao === 'navegador' || acao === 'cinema' || acao === 'loja-nativa' ? 'Abrindo no PS2… (até 30 s)' : 'Enviando…';
+  try {
+    const r = await (await fetch('api/sistema', {method:'POST', headers:{'Content-Type':'application/json'},
+                                                body: JSON.stringify({acao})})).json();
+    $('sismsg').innerHTML = (r.ok ? tag('ok','OK') : tag('ruim','ERRO')) + ' ' + r.msg;
+  } catch (e) { $('sismsg').innerHTML = tag('ruim','ERRO') + ' sem resposta da página'; }
+});
+
+// ---- Estatísticas ----
+const hm = (s) => s >= 3600 ? `${Math.floor(s/3600)}h${String(Math.floor(s%3600/60)).padStart(2,'0')}` : `${Math.round(s/60)} min`;
+const quando = (t) => { const d = new Date(t*1000), h = new Date();
+  const dia = d.toDateString() === h.toDateString() ? 'hoje' : d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+  return dia + ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}); };
+const esc = (t) => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function carregarEstat() {
+  try {
+    const e = await (await fetch('api/estatisticas', {cache:'no-store'})).json();
+    $('eshoje').textContent = hm(e.hoje_s); $('essemana').textContent = hm(e.semana_s); $('estotal').textContent = hm(e.total_s);
+    const max = e.jogos.length ? e.jogos[0].segundos : 1;
+    $('ranking').innerHTML = e.jogos.slice(0, 8).map(j => `
+      <div class="rank"><div class="mini2" style="${j.capa ? `background-image:url('${j.capa}')` : ''}"></div>
+        <div class="nome">${esc(j.nome)}${e.atual && e.atual.id === j.id ? ' ' + tag('ok','agora') : ''}</div>
+        <div class="tempo">${hm(j.segundos)}<br>${j.sessoes} ${j.sessoes === 1 ? 'vez' : 'vezes'}</div>
+        <div class="barra"><div style="width:${j.segundos / max * 100}%"></div></div></div>`).join('')
+      || '<p class="id">Ainda sem registro: o tempo começa a contar no próximo jogo.</p>';
+    $('recentes').innerHTML = e.recentes.map(s => `
+      <div class="sessao"><span>${esc(s.nome)} <small class="id">${s.origem}</small></span>
+        <span>${quando(s.inicio)} · ${hm(s.seg)}</span></div>`).join('') || '<p class="id">Nenhuma sessão ainda.</p>';
+  } catch (e) {}
+}
+
+carregarJogos(); carregarProximo(); carregarEstat();
+setInterval(carregarEstat, 30000);
+setInterval(carregarProximo, 10000);
+setInterval(carregarJogos, 60000);   // capas que terminaram de baixar
+</script>
+<script src="temperatura.js"></script>
+</body>
+</html>

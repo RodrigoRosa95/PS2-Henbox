@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loja PS2</title>
+<!-- Loja de jogos do PS2 (pedido do usuário 16/10/2026). Feita para abrir no navegador do PS2 (640x448 com zoom 1,5
+     = 427x299 CSS): sem animação contínua (cada mudança de tela vira tráfego para o PS2), alvos grandes para o
+     cursor do controle, sem alert/confirm (confirmação com segundo toque). Também funciona no celular e no PC. -->
+<style>
+  :root { --fundo1:#04102a; --fundo2:#0a2a6b; --vidro:rgba(255,255,255,0.071); --borda:rgba(255,255,255,0.141); --texto:#eef3ff; --fraco:#9fb3d9;
+          --azul:#3d8bff; --verde:#2fd27a; --vermelho:#ff5a6a; --amarelo:#ffc542;
+          --tri:#2fd2a8; --cir:#ff5a6a; --xis:#6aa5ff; --qua:#e58bff; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; min-height:100%; }
+  body { color:var(--texto); font:14px/1.35 system-ui, "Segoe UI", Roboto, sans-serif;
+         background:var(--fundo1) radial-gradient(120% 90% at 85% -10%, #1f5fd6 0%, var(--fundo2) 38%, var(--fundo1) 75%) fixed; }
+  /* onda estática no fundo, lembrando o menu do console */
+  body::before { content:""; position:fixed; top:auto; right:0; bottom:0; left:0; height:55%; pointer-events:none; opacity:.35;
+    background:
+      radial-gradient(160% 60% at 30% 100%, transparent 58%, rgba(127,178,255,0.333) 59%, transparent 61%),
+      radial-gradient(140% 55% at 70% 105%, transparent 60%, rgba(255,255,255,0.251) 61%, transparent 62.5%); }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px; padding:8px 12px;
+           background:linear-gradient(180deg, rgba(4,16,42,0.949), rgba(4,16,42,0.8)); border-bottom:1px solid var(--borda); }
+  .logo { display:flex; gap:3px; font-weight:900; font-size:15px; letter-spacing:.5px; }
+  .logo b { width:18px; height:18px; border-radius:5px; display:grid; place-items:center; font-size:12px; color:#04102a; }
+  .logo .t { background:var(--tri); } .logo .c { background:var(--cir); } .logo .x { background:var(--xis); } .logo .q { background:var(--qua); }
+  h1 { margin:0; font-size:17px; font-weight:800; white-space:nowrap; }
+  h1 small { color:var(--fraco); font-weight:500; font-size:12px; }
+  .espaco { margin-left:auto; min-width:120px; font-size:12px; color:var(--fraco); text-align:right; }
+  .espaco .barra { height:6px; border-radius:3px; background:rgba(255,255,255,0.11); overflow:hidden; margin-top:3px; }
+  .espaco .barra div { height:100%; background:linear-gradient(90deg, var(--verde), var(--amarelo), var(--vermelho)); }
+  nav { display:flex; gap:6px; padding:8px 12px 2px; overflow-x:auto; scrollbar-width:none; }
+  nav button, .btn { font:inherit; color:var(--texto); background:var(--vidro); border:1px solid var(--borda);
+         border-radius:999px; padding:6px 13px; cursor:pointer; white-space:nowrap; }
+  nav button.ativo { background:var(--azul); border-color:var(--azul); font-weight:700; }
+  nav input { font:inherit; color:var(--texto); background:rgba(0,0,0,0.251); border:1px solid var(--borda); border-radius:999px;
+              padding:6px 12px; min-width:110px; flex:1; }
+  nav input::placeholder { color:var(--fraco); }
+  main { padding:10px 12px 70px; }
+  .grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:12px 10px; }
+  .card { position:relative; background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+  .capa { aspect-ratio:7/10; border-radius:8px; overflow:hidden; background:#0e1f45 center/cover no-repeat;
+          border:2px solid transparent; box-shadow:0 6px 16px rgba(0,0,0,0.533); display:flex; align-items:flex-end; }
+  .card:hover .capa, .card:focus .capa { border-color:#fff; }
+  /* WebView 74 da TV box (navegador do PS2) não tem aspect-ratio nem min(): alturas fixas no lugar */
+  @supports not (aspect-ratio: 1 / 1) { .capa { height:134px; } .detalhe .capa { height:171px; } }
+  .semcapa { width:100%; height:100%; display:flex; flex-direction:column; justify-content:flex-end; padding:8px;
+             background:linear-gradient(160deg, #2a5bd7, #0b1d4a); font-weight:800; font-size:13px; line-height:1.15; }
+  .semcapa span { font-size:28px; opacity:.5; margin-bottom:auto; }
+  .nome { margin-top:5px; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .info { font-size:11px; color:var(--fraco); }
+  .selo { position:absolute; top:5px; left:5px; padding:2px 7px; border-radius:999px; font-size:10.5px; font-weight:800;
+          box-shadow:0 2px 6px rgba(0,0,0,0.467); }
+  .selo.ok { background:var(--verde); color:#04210f; } .selo.baixando { background:var(--amarelo); color:#2a1d00; }
+  .selo.erro { background:var(--vermelho); color:#fff; }
+  .mini { position:absolute; left:6px; right:6px; bottom:30px; height:5px; border-radius:3px; background:rgba(0,0,0,0.6); overflow:hidden; }
+  .mini div { height:100%; background:var(--amarelo); }
+  .vazio { color:var(--fraco); text-align:center; padding:30px 0; }
+  /* detalhe */
+  .veu { position:fixed; top:0; right:0; bottom:0; left:0; z-index:10; background:rgba(2,8,20,0.851); display:none; align-items:center; justify-content:center; padding:10px; }
+  .veu.aberto { display:flex; }
+  .detalhe { width:560px; max-width:100%; width:min(560px, 100%); max-height:100%; overflow:auto; display:grid; grid-template-columns:120px 1fr; gap:14px;
+             background:linear-gradient(160deg, rgba(19,48,111,0.933), rgba(7,21,51,0.949)); border:1px solid var(--borda); border-radius:14px; padding:14px; }
+  .detalhe .capa { box-shadow:0 10px 30px rgba(0,0,0,0.667); }
+  .detalhe h2 { margin:0 0 4px; font-size:18px; line-height:1.15; }
+  .linhas { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:12.5px; margin:8px 0 10px; }
+  .linhas span:nth-child(odd) { color:var(--fraco); }
+  .acoes { display:flex; flex-wrap:wrap; gap:8px; }
+  .btn { border-radius:10px; padding:9px 14px; font-weight:700; }
+  .btn.prim { background:var(--azul); border-color:var(--azul); }
+  .btn.verde { background:#1c9c58; border-color:#1c9c58; }
+  .btn.perigo { background:rgba(255,255,255,0.063); border-color:var(--vermelho); color:#ffc7cd; }
+  .btn.perigo.armado { background:var(--vermelho); color:#fff; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .progresso { margin-top:10px; font-size:12px; color:var(--fraco); }
+  .progresso .barra { height:9px; border-radius:5px; background:rgba(255,255,255,0.11); overflow:hidden; margin:4px 0; }
+  .progresso .barra div { height:100%; background:linear-gradient(90deg, var(--azul), var(--verde)); }
+  .msg { margin-top:8px; font-size:12.5px; min-height:1.3em; }
+  .fechar { position:absolute; top:10px; right:12px; }
+  /* barra de download embaixo */
+  .downloads { position:fixed; left:0; right:0; bottom:0; z-index:6; display:none; align-items:center; gap:10px; padding:8px 12px;
+               background:rgba(4,16,42,0.961); border-top:1px solid var(--borda); font-size:12.5px; }
+  .downloads.ativo { display:flex; }
+  .downloads .barra { flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,0.11); overflow:hidden; }
+  .downloads .barra div { height:100%; background:linear-gradient(90deg, var(--azul), var(--verde)); }
+  .dica { position:fixed; right:12px; bottom:8px; font-size:11px; color:var(--fraco); }
+  .downloads.ativo ~ .dica { display:none; }
+  @media (max-width:460px) {
+    h1 small, .dica { display:none; }
+    .detalhe { grid-template-columns:96px 1fr; gap:10px; padding:10px; }
+    .detalhe h2 { font-size:16px; }
+    .btn { padding:8px 11px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><b class="t">△</b><b class="c">○</b><b class="x">✕</b><b class="q">□</b></div>
+  <h1>Loja PS2 <small>jogos do HD 01TERA<span id="ps2temp" hidden style="font-size:12px;margin-left:10px;white-space:nowrap"></span></small></h1>
+  <div class="espaco"><span id="espaco">pendrive —</span><div class="barra"><div id="espbarra" style="width:0"></div></div></div>
+</header>
+<nav id="abas">
+  <button data-aba="todos" class="ativo">Todos</button>
+  <button data-aba="instalados">Instalados</button>
+  <button data-aba="disponiveis">Para instalar</button>
+  <button data-aba="jogados">Mais jogados</button>
+  <button data-aba="novos">Novidades</button>
+  <button data-aba="snes">🕹 Super Nintendo</button>
+  <input id="busca" placeholder="🔍 Buscar" autocomplete="off">
+</nav>
+<main><div class="grade" id="grade"></div><div class="vazio" id="vazio" hidden>Nenhum jogo aqui.</div></main>
+
+<div class="veu" id="veu">
+  <div class="detalhe" style="position:relative">
+    <div class="capa" id="dcapa"></div>
+    <div>
+      <h2 id="dnome"></h2>
+      <div class="linhas" id="dlinhas"></div>
+      <div class="acoes" id="dacoes"></div>
+      <div class="progresso" id="dprog" hidden><span id="dprogtxt"></span><div class="barra"><div id="dprogbarra"></div></div></div>
+      <div class="msg" id="dmsg"></div>
+    </div>
+    <button class="btn fechar" id="fechar">✕</button>
+  </div>
+</div>
+<div class="downloads" id="downloads"><span id="dltxt"></span><div class="barra"><div id="dlbarra"></div></div></div>
+<div class="dica">✕ abrir · ○ voltar · □ teclado</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const gb = (b) => b >= 1073741824 ? (b/1073741824).toFixed(1).replace('.', ',') + ' GB' : Math.round(b/1048576) + ' MB';
+const hm = (s) => s >= 3600 ? `${Math.floor(s/3600)}h${String(Math.floor(s%3600/60)).padStart(2,'0')}` : `${Math.round(s/60)} min`;
+let dados = {jogos:[], livre:0, total:0}, aba = 'todos', aberto = null, armado = null;
+// ROMs de SNES (extraídas do ISO do emulador que o usuário já tinha): vão para o pendrive USB do PS2, gravadas
+// pelo próprio navegador do PS2 — por isso o botão só funciona com a loja aberta no PS2.
+let roms = [], navegadorAberto = false;
+let retro = {tipo: 'ra', arquivo: '__retroarch__', nome: 'SNESticle (emulador)', tamanho: 0, capa: 'capas/snes/_retroarch.jpg', pedido: {}, versao: ''};
+
+function selo(j) {
+  if (j.tipo === 'snes' || j.tipo === 'ra') {
+    const p = j.pedido || {};
+    if (p.andamento) return `<span class="selo baixando">${p.fase === 'abrindo' ? '▶' : '⬇'} ${p.pct || 0}%</span>`;
+    if (p.no_pendrive) return '<span class="selo ok">✔ no pendrive</span>';
+    if (p.estado && !p.ok) return '<span class="selo erro">erro</span>';
+    return '';
+  }
+  const e = j.estado || {};
+  if (e.fase === 'copiando' || e.fase === 'conferindo') return `<span class="selo baixando">⬇ ${Math.floor(e.feito/e.total*100)}%</span>`;
+  if (e.fase === 'fila') return '<span class="selo baixando">na fila</span>';
+  if (e.fase === 'erro') return '<span class="selo erro">erro</span>';
+  if (j.instalado) return '<span class="selo ok">✔ instalado</span>';
+  return '';
+}
+function capaHtml(j) {
+  return j.capa ? `<div class="capa" style="background-image:url('${esc(j.capa)}')"></div>`
+                : `<div class="capa"><div class="semcapa"><span>🎮</span>${esc(j.nome)}</div></div>`;
+}
+function lista() {
+  const q = $('busca').value.trim().toLowerCase();
+  if (aba === 'snes') {   // passo 1 da aba: o cartão do emulador (SNESticle) vem primeiro
+    const lista = roms.filter(j => !q || j.nome.toLowerCase().includes(q));
+    return q ? lista : [retro, ...lista];
+  }
+  let js = dados.jogos.filter(j => !q || j.nome.toLowerCase().includes(q) || j.id.toLowerCase().includes(q));
+  if (aba === 'instalados') js = js.filter(j => j.instalado);
+  if (aba === 'disponiveis') js = js.filter(j => !j.instalado);
+  if (aba === 'jogados') js = js.filter(j => j.jogado_s > 0).sort((a, b) => b.jogado_s - a.jogado_s);
+  if (aba === 'novos') js = js.filter(j => j.novo).sort((a, b) => b.novo - a.novo).slice(0, 12);
+  return js;
+}
+function desenhar() {
+  const js = lista();
+  $('grade').innerHTML = js.map(j => `
+    <button class="card" data-arq="${esc(j.arquivo)}">
+      ${selo(j)}${capaHtml(j)}
+      ${(j.estado && j.estado.fase === 'copiando') ? `<div class="mini"><div style="width:${j.estado.feito/j.estado.total*100}%"></div></div>` : ''}
+      <div class="nome">${esc(j.nome)}</div>
+      <div class="info">${gb(j.tamanho)}${j.jogado_s ? ' · ' + hm(j.jogado_s) : ''}</div>
+    </button>`).join('');
+  $('vazio').hidden = js.length > 0;
+  const usado = dados.total - dados.livre;
+  $('espaco').textContent = `pendrive: ${gb(dados.livre)} livres`;
+  $('espbarra').style.width = (dados.total ? usado / dados.total * 100 : 0) + '%';
+  const ativo = dados.jogos.find(j => j.estado && (j.estado.fase === 'copiando' || j.estado.fase === 'conferindo'));
+  const falhou = !ativo && dados.jogos.find(j => j.estado && j.estado.fase === 'erro' && Date.now() / 1000 - j.estado.t < 600);
+  if (falhou) {
+    $('downloads').classList.add('ativo');
+    $('dltxt').textContent = `⚠ ${falhou.nome}: ${falhou.estado.msg}`;
+    $('dlbarra').style.width = '0';
+  }
+  $('downloads').classList.toggle('ativo', !!ativo || !!falhou);
+  if (ativo) {
+    const e = ativo.estado, falta = e.vel ? Math.max(0, (e.total - e.feito) / e.vel) : 0;
+    $('dltxt').textContent = e.fase === 'conferindo' ? `Conferindo ${ativo.nome}…`
+      : `⬇ ${ativo.nome} · ${Math.floor(e.feito/e.total*100)}% · ${(e.vel/1048576).toFixed(1)} MB/s · ${Math.ceil(falta/60)} min` +
+        (dados.fila.length ? ` · +${dados.fila.length} na fila` : '');
+    $('dlbarra').style.width = (e.feito / e.total * 100) + '%';
+  }
+  if (aberto) detalhe(aberto, true);
+}
+function detalheSnes(j, manterMsg) {
+  const p = j.pedido || {}, ocupado = !!p.andamento;
+  $('dcapa').outerHTML = capaHtml(j).replace('class="capa"', 'class="capa" id="dcapa"');
+  $('dnome').textContent = j.nome;
+  $('dlinhas').innerHTML = [['Console', 'Super Nintendo'], ['Tamanho', gb(j.tamanho)],
+    ['No pendrive do PS2', 'SNES/ + SNESticle em APPS/SNESTICLE'], ['Emulador', 'SNESticle Revive']]
+    .map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('');
+  $('dacoes').innerHTML =
+    `<button class="btn prim" data-faz="snes" ${navegadorAberto && !ocupado ? '' : 'disabled'}>⬇ Baixar no pendrive do PS2</button>` +
+    `<button class="btn verde" data-faz="snesjogar" ${!ocupado ? '' : 'disabled'}>▶ Jogar</button>` +
+    (navegadorAberto ? '' : '<span class="info" style="align-self:center">para baixar, abra a loja no PS2 com um pendrive na USB</span>');
+  $('dprog').hidden = !ocupado;
+  if (ocupado) {
+    $('dprogtxt').textContent = p.fase === 'abrindo' ? 'Abrindo o SNESticle no PS2…' :
+      (p.fase === 'instalando o emulador' ? 'Instalando o SNESticle no pendrive… ' : 'Gravando no pendrive do PS2… ') + (p.pct || 0) + '%';
+    $('dprogbarra').style.width = (p.pct || 0) + '%';
+  }
+  if (!ocupado && p.ok && p.op === 1) $('dmsg').textContent = '▶ Abrindo no SNESticle do pendrive…';
+  else if (!ocupado && p.ok && p.op === 0) $('dmsg').textContent = '✔ No pendrive (SNES/). ▶ Jogar abre no SNESticle; sem o notebook: OPL → Apps → SNESticle (SNES).';
+  else if (!ocupado && p.estado && !p.ok) $('dmsg').textContent = '⚠ ' + (p.estado === 'pendrive não encontrado no PS2 (ou sem espaço)' && p.op === 1
+      ? 'a ROM não está no pendrive do PS2: baixe primeiro' : p.estado === 'erro lendo a ROM do notebook' && p.op === 1
+      ? 'o SNESticle não está no pendrive: baixe a ROM primeiro (ele vai junto)' : p.estado);
+  else if (!manterMsg) $('dmsg').textContent = '';
+  $('veu').classList.add('aberto');
+}
+function detalheRetro(manterMsg) {
+  const p = retro.pedido || {}, ocupado = !!p.andamento;
+  $('dcapa').outerHTML = capaHtml(retro).replace('class="capa"', 'class="capa" id="dcapa"');
+  $('dnome').textContent = 'SNESticle — Super Nintendo';
+  $('dlinhas').innerHTML = [['O que é', 'SNESticle Revive (GPLv3) com a ROM direto e DualShock 4 por Bluetooth'], ['Versão no notebook', retro.versao || '—'],
+    ['Tamanho', gb(retro.tamanho || 0)], ['No pendrive do PS2', 'APPS/SNESTICLE (aparece no OPL → Apps)'],
+    ['Na TV box', retro.na_tvbox ? 'instalado em APPS/SNESTICLE (OPL → Apps pelo Samba)' : 'não'],
+    ['Passos', '1 instalar · 2 baixar jogos · 3 ▶ Jogar']]
+    .map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('');
+  $('dacoes').innerHTML =
+    `<button class="btn prim" data-faz="rainstalar" ${navegadorAberto && !ocupado ? '' : 'disabled'}>⬇ Instalar no pendrive do PS2</button>` +
+    `<button class="btn prim" data-faz="ratvbox" ${!ocupado ? '' : 'disabled'}>📺 ${retro.na_tvbox ? 'Reinstalar' : 'Instalar'} na TV box</button>` +
+    (navegadorAberto ? '' : '<span class="info" style="align-self:center">para instalar, abra a loja no PS2 com um pendrive na USB</span>');
+  $('dprog').hidden = !ocupado;
+  if (ocupado) { $('dprogtxt').textContent = `Instalando no pendrive do PS2… ${p.pct || 0}%`; $('dprogbarra').style.width = (p.pct || 0) + '%'; }
+  if (!ocupado && p.no_pendrive) $('dmsg').textContent = '✔ SNESticle instalado no pendrive. Agora baixe os jogos.';
+  else if (!ocupado && p.estado && !p.ok) $('dmsg').textContent = '⚠ ' + p.estado;
+  else if (!manterMsg) $('dmsg').textContent = '';
+  $('veu').classList.add('aberto');
+}
+function detalhe(arq, manterMsg) {
+  if (arq === '__retroarch__') { aberto = arq; return detalheRetro(manterMsg); }
+  const r = roms.find(x => x.arquivo === arq);
+  if (r) { aberto = arq; return detalheSnes(r, manterMsg); }
+  const j = dados.jogos.find(x => x.arquivo === arq); if (!j) return;
+  aberto = arq;
+  const e = j.estado || {};
+  $('dcapa').outerHTML = capaHtml(j).replace('class="capa"', 'class="capa" id="dcapa"');
+  $('dnome').textContent = j.nome;
+  $('dlinhas').innerHTML = [
+    ['Código', j.id || '—'], ['Região', j.regiao], ['Tamanho', gb(j.tamanho)],
+    ['Jogado', j.jogado_s ? hm(j.jogado_s) : 'nunca'],
+    ['Onde', j.so_pendrive ? 'só no pendrive' : (j.instalado ? 'pendrive + 01TERA' : 'HD 01TERA')],
+  ].map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('');
+  const ocupado = ['fila', 'copiando', 'conferindo'].includes(e.fase);
+  let b = '';
+  if (j.instalado) {
+    b += `<button class="btn verde" data-faz="jogar" ${j.id ? '' : 'disabled'}>▶ Jogar</button>`;
+    if (!j.so_pendrive) b += `<button class="btn perigo ${armado === arq ? 'armado' : ''}" data-faz="desinstalar">${armado === arq ? '🗑 Confirmar?' : '🗑 Desinstalar'}</button>`;
+  } else if (ocupado) {
+    b += `<button class="btn" data-faz="cancelar">✕ Cancelar</button>`;
+  } else {
+    // aberta pela TV box (videos.py, porta 8780): o ISO pode rodar direto do HD do notebook (udpfs_nuvem.py)
+    if (location.port === '8780' && j.id) b += `<button class="btn verde" data-faz="jogar">☁ Jogar pela rede</button>`;
+    const cabe = j.tamanho + 64*1048576 <= dados.livre;
+    b += `<button class="btn prim" data-faz="instalar" ${j.cabe_fat32 ? '' : 'disabled'}>⬇ Instalar (${gb(j.tamanho)})</button>`;
+    if (!cabe && j.cabe_fat32) b += `<span class="info" style="align-self:center">falta ${gb(j.tamanho + 64*1048576 - dados.livre)}: desinstale algum jogo</span>`;
+  }
+  $('dacoes').innerHTML = b;
+  $('dprog').hidden = !(e.fase === 'copiando' || e.fase === 'conferindo');
+  if (!$('dprog').hidden) {
+    $('dprogtxt').textContent = e.fase === 'conferindo' ? 'Conferindo a cópia (MD5)…'
+      : `${gb(e.feito)} de ${gb(e.total)} · ${(e.vel/1048576).toFixed(1)} MB/s`;
+    $('dprogbarra').style.width = (e.feito / e.total * 100) + '%';
+  }
+  // erro/fim de instalação sempre aparece (antes ficava escondido atrás de "adicionado à fila")
+  if (e.fase === 'erro') $('dmsg').textContent = '⚠ ' + e.msg;
+  else if (e.fase === 'pronto') $('dmsg').textContent = '✔ Instalado e conferido.';
+  else if (!manterMsg) $('dmsg').textContent = '';
+  $('veu').classList.add('aberto');
+}
+function fechar() { aberto = null; armado = null; $('veu').classList.remove('aberto'); }
+
+async function carregar() {
+  try { dados = await (await fetch('api/loja', {cache:'no-store'})).json(); } catch (e) { return; }
+  try {
+    const s = await (await fetch('api/loja/snes', {cache:'no-store'})).json();
+    navegadorAberto = s.navegador;
+    roms = s.roms.map(r => ({...r, arquivo: 'snes:' + r.arquivo, rom: r.arquivo, tipo: 'snes', id: '', regiao: '—'}));
+    retro = {...retro, pedido: s.retroarch.pedido || {}, versao: s.retroarch.versao, tamanho: s.retroarch.tamanho || 0, na_tvbox: !!s.retroarch.na_tvbox};
+  } catch (e) {}
+  desenhar();
+}
+async function fazer(acao, j) {
+  $('dmsg').textContent = 'Enviando…';
+  const url = {jogar: 'api/jogar', snesjogar: 'api/loja/snes/jogar', rainstalar: 'api/loja/snes/retroarch', ratvbox: 'api/loja/snes/tvbox-retroarch',
+               raatualizar: 'api/loja/snes/atualizar-retroarch'}[acao] || 'api/loja/' + acao;
+  if (acao === 'raatualizar') $('dmsg').textContent = 'Baixando do site oficial do libretro…';
+  if (acao === 'ratvbox') $('dmsg').textContent = 'Copiando para o pendrive da TV box…';
+  const corpo = acao === 'jogar' ? {id: j.id} : {arquivo: (acao === 'snes' || acao === 'snesjogar') ? j.rom : j.arquivo};
+  try {
+    const r = await (await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo)})).json();
+    $('dmsg').textContent = (r.ok ? '✔ ' : '⚠ ') + r.msg;
+  } catch (e) { $('dmsg').textContent = '⚠ sem resposta'; }
+  await carregar();
+}
+
+$('grade').addEventListener('click', ev => { const c = ev.target.closest('.card'); if (c) { armado = null; detalhe(c.dataset.arq); } });
+$('abas').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  aba = b.dataset.aba;
+  document.querySelectorAll('#abas button').forEach(x => x.classList.toggle('ativo', x === b));
+  desenhar(); scrollTo(0, 0);
+});
+$('busca').addEventListener('input', desenhar);
+$('fechar').addEventListener('click', fechar);
+$('veu').addEventListener('click', ev => { if (ev.target === $('veu')) fechar(); });
+$('dacoes').addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b || b.disabled) return;
+  const j = dados.jogos.find(x => x.arquivo === aberto) || roms.find(x => x.arquivo === aberto) || retro, acao = b.dataset.faz;
+  if (acao === 'desinstalar' && armado !== aberto) {   // segundo toque confirma
+    armado = aberto; detalhe(aberto, true);
+    setTimeout(() => { if (armado) { armado = null; if (aberto) detalhe(aberto, true); } }, 5000);
+    return;
+  }
+  armado = null;
+  fazer(acao, j);
+});
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') fechar(); });
+
+if (location.hash === '#snes') {   // loja.html#snes abre direto na aba do Super Nintendo
+  aba = 'snes';
+  document.querySelectorAll('#abas button').forEach(x => x.classList.toggle('ativo', x.dataset.aba === 'snes'));
+}
+carregar();
+// atualiza rápido durante uma instalação, devagar no resto (menos tráfego para o PS2)
+(function ciclo() {
+  const ativo = dados.jogos.some(j => j.estado && ['fila', 'copiando', 'conferindo'].includes(j.estado.fase))
+             || roms.some(r => r.pedido && r.pedido.andamento) || !!(retro.pedido && retro.pedido.andamento);
+  setTimeout(() => carregar().then(ciclo), ativo ? 2000 : 15000);
+})();
+</script>
+<script src="temperatura.js"></script>
+</body>
+</html>

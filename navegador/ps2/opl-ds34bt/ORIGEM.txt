@@ -1,0 +1,2 @@
+OPL commit b3a2199 2026-10-12
+Compilado do código oficial https://github.com/ps2homebrew/Open-PS2-Loader (modules/ds34bt) em 16/10/2026 para o DualShock 3/4 por Bluetooth no navegador.

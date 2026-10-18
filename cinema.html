@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cinema PS2</title>
+<!-- Cinema no PS2 (pedido do usuário 17/10/2026): Jellyfin e TV ao vivo. Feita para o navegador do PS2 (427x299 CSS
+     com zoom 1,5): alvos grandes para o cursor, sem animação contínua, sem alert/confirm. ▶ Assistir pede ao
+     notebook (cinema.py) a conversão para MPEG-2 e o PS2 passa a tocar sozinho pelo IPU. -->
+<style>
+  :root { --fundo:#0b0b0f; --painel:#16161d; --borda:rgba(255,255,255,0.122); --texto:#f3f3f6; --fraco:#a2a2b0; --verm:#e50914; --verde:#2fd27a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--texto); font:14px/1.35 system-ui, "Segoe UI", Roboto, sans-serif; }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:8px; padding:8px 12px;
+           background:linear-gradient(180deg, rgba(0,0,0,0.941), rgba(0,0,0,0.753)); }
+  .logo { color:var(--verm); font-weight:900; font-size:19px; letter-spacing:1px; margin-right:6px; }
+  nav { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+  nav button, .btn { font:inherit; color:var(--texto); background:rgba(255,255,255,0.078); border:1px solid var(--borda); border-radius:999px;
+         padding:6px 12px; cursor:pointer; white-space:nowrap; }
+  nav button.ativo { background:var(--texto); color:#000; font-weight:700; }
+  main { padding:10px 12px 60px; }
+  .grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:12px 10px; }
+  .grade.canais { grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); }
+  .card { background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer; position:relative; }
+  .capa { aspect-ratio:2/3; border-radius:6px; background:#22222c center/cover no-repeat; border:2px solid transparent; }
+  .canais .capa { aspect-ratio:4/3; }
+  .card:hover .capa { border-color:#fff; }
+  .nome { margin-top:4px; font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .info { font-size:11px; color:var(--fraco); }
+  .prog { position:absolute; left:4px; right:4px; height:4px; background:rgba(0,0,0,0.533); border-radius:2px; overflow:hidden; }
+  .prog div { height:100%; background:var(--verm); }
+  .filtros { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .filtros button { font:inherit; font-size:12px; color:var(--texto); background:rgba(255,255,255,0.063); border:1px solid var(--borda);
+                    border-radius:6px; padding:4px 9px; cursor:pointer; }
+  .filtros button.ativo { border-color:var(--verm); background:rgba(229,9,20,0.2); }
+  .vazio { color:var(--fraco); padding:30px 0; text-align:center; }
+  .veu { position:fixed; top:0; right:0; bottom:0; left:0; z-index:10; background:rgba(0,0,0,0.902); display:none; overflow:auto; padding:10px; }
+  .veu.aberto { display:block; }
+  .ficha { max-width:620px; margin:0 auto; display:grid; grid-template-columns:110px 1fr; gap:12px; }
+  .ficha .capa { aspect-ratio:2/3; }
+  .ficha h2 { margin:0 0 4px; font-size:18px; line-height:1.15; }
+  .ficha p { margin:4px 0 8px; color:#d6d6de; font-size:12.5px; }
+  .acoes { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0; }
+  .btn { border-radius:6px; padding:8px 14px; font-weight:700; }
+  .btn.play { background:#fff; color:#000; border-color:#fff; }
+  .temps { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; grid-column:1/-1; }
+  .eps { grid-column:1/-1; display:grid; gap:6px; }
+  .ep { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:center; background:var(--painel); border:1px solid var(--borda);
+        border-radius:8px; padding:8px 10px; cursor:pointer; font:inherit; color:inherit; text-align:left; }
+  .ep:hover { border-color:#fff; }
+  .ep small { color:var(--fraco); display:block; }
+  .ep .ok { color:var(--verde); font-size:12px; }
+  .baixado { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; background:var(--painel);
+             border:1px solid var(--borda); border-radius:8px; padding:8px 10px; margin-bottom:6px; }
+  .baixado small { color:var(--fraco); display:block; }
+  .barra { height:4px; background:rgba(255,255,255,0.11); border-radius:2px; margin-top:4px; overflow:hidden; }
+  .barra div { height:100%; background:var(--verm); }
+  #msg { grid-column:1/-1; min-height:1.3em; color:var(--fraco); font-size:12.5px; }
+  .fechar { position:fixed; top:8px; right:10px; z-index:11; }
+  .dica { position:fixed; right:10px; bottom:6px; font-size:11px; color:var(--fraco); }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">CINEMA</span><span id="ps2temp" hidden style="font-size:12px;margin:0 10px;white-space:nowrap"></span>
+  <nav id="abas">
+    <button data-aba="continuar" class="ativo">Continuar</button>
+    <button data-aba="series">Séries</button>
+    <button data-aba="filmes">Filmes</button>
+    <button data-aba="canais">📺 Ao vivo</button>
+    <button data-aba="baixados">⬇ Baixados</button>
+  </nav>
+</header>
+<main>
+  <div class="filtros" id="filtros" hidden></div>
+  <div class="grade" id="grade"></div>
+  <div class="vazio" id="vazio" hidden>Carregando…</div>
+</main>
+<div class="veu" id="veu"><button class="btn fechar" id="fechar">✕</button><div class="ficha" id="ficha"></div></div>
+<div class="dica">✕ abrir · ○ voltar · no vídeo: ○ para · ✕ pausa · ← → 30 s</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const min = s => s >= 3600 ? `${Math.floor(s/3600)}h${String(Math.floor(s%3600/60)).padStart(2,'0')}` : `${Math.round(s/60)} min`;
+let dados = null, aba = 'continuar', grupo = 'Rede Canais';
+
+async function carregar() {
+  $('vazio').hidden = false; $('vazio').textContent = 'Carregando…';
+  try { dados = await (await fetch('api/cinema/inicio', {cache:'no-store'})).json(); }
+  catch (e) { $('vazio').textContent = 'Sem resposta do notebook.'; return; }
+  desenhar();
+}
+function card(i, canal) {
+  const prog = !canal && i.posicao && i.duracao ? `<div class="prog" style="bottom:${canal ? 4 : 38}px"><div style="width:${Math.min(100, i.posicao / i.duracao * 100)}%"></div></div>` : '';
+  return `<button class="card" data-${canal ? 'canal' : 'id'}="${esc(i.id)}" data-tipo="${esc(i.tipo || '')}">
+    <div class="capa" style="background-image:url('${esc(i.capa)}')"></div>${prog}
+    <div class="nome">${esc(i.nome)}</div>
+    <div class="info">${canal ? esc(i.grupo) : (i.ano ? i.ano + ' · ' : '') + (i.duracao ? min(i.duracao) : '')}</div></button>`;
+}
+let baixadosLista = [];
+async function carregarBaixados() {
+  try { baixadosLista = await (await fetch('api/cinema/baixados', {cache:'no-store'})).json(); } catch (e) {}
+  if (aba === 'baixados') desenhar();
+}
+const ESTADO_TXT = {'na fila': 'na fila', 'convertendo': 'convertendo no notebook', 'convertido': 'pronto no notebook · abra o cinema no PS2 para gravar',
+                    'copiando': 'gravando no pendrive do PS2', 'no pendrive': '✔ no pendrive · SMS → USB → CINEMA', 'apagando': 'apagando', 'erro': '⚠ erro'};
+function desenharBaixados() {
+  const g = $('grade');
+  g.classList.remove('canais');
+  g.style.display = 'block';
+  g.innerHTML = '<p class="info" style="margin:0 0 10px">Os baixados ficam no pendrive do PS2 e tocam no <b>SMS</b> (OPL → Apps → SMS → USB → pasta CINEMA), mesmo com o notebook desligado.</p>' +
+    baixadosLista.map(b => `<div class="baixado"><div>${esc(b.titulo)}
+      <small>${esc(ESTADO_TXT[b.estado] || b.estado)}${b.estado === 'erro' && b.msg ? ': ' + esc(b.msg) : ''}${b.tamanho ? ' · ' + Math.round(b.tamanho / 1048576) + ' MB' : ''}</small>
+      ${['convertendo', 'copiando'].includes(b.estado) ? `<div class="barra"><div style="width:${b.pct || 0}%"></div></div>` : ''}</div>
+      <button class="btn" data-apagar="${esc(b.slug)}" style="font-size:12px">🗑 ${b.estado === 'no pendrive' ? 'Apagar do pendrive' : 'Tirar da lista'}</button></div>`).join('');
+  $('vazio').hidden = baixadosLista.length > 0;
+  $('vazio').textContent = 'Nenhum baixado. Na ficha de um filme ou episódio, toque em ⬇ Baixar para ver depois.';
+}
+function desenhar() {
+  const g = $('grade');
+  g.style.display = '';
+  if (aba === 'baixados') return desenharBaixados();
+  $('filtros').hidden = aba !== 'canais';
+  g.classList.toggle('canais', aba === 'canais');
+  let lista;
+  if (aba === 'canais') {
+    const grupos = [...new Set(dados.canais.map(c => c.grupo))];
+    $('filtros').innerHTML = grupos.map(x => `<button data-grupo="${esc(x)}" class="${x === grupo ? 'ativo' : ''}">${esc(x)}</button>`).join('');
+    lista = dados.canais.filter(c => c.grupo === grupo);
+    g.innerHTML = lista.map(c => card(c, true)).join('');
+  } else {
+    lista = dados[aba] || [];
+    g.innerHTML = lista.map(i => card(i, false)).join('');
+  }
+  $('vazio').hidden = lista.length > 0;
+  $('vazio').textContent = 'Nada aqui.';
+}
+function abrirItem(i) {
+  $('ficha').innerHTML = `
+    <div class="capa" style="background-image:url('${esc(i.capa)}')"></div>
+    <div><h2>${esc(i.nome)}</h2>
+      <div class="info">${i.ano ? i.ano + ' · ' : ''}${i.duracao ? min(i.duracao) : ''}${i.assistido ? ' · ✔ assistido' : ''}</div>
+      <p>${esc(i.sinopse || 'Sem sinopse.')}</p>
+      <div class="acoes">
+        <button class="btn play" data-tocar="${esc(i.id)}" data-inicio="${i.posicao || 0}">▶ ${i.posicao > 30 ? 'Continuar de ' + min(i.posicao) : 'Assistir'}</button>
+        ${i.posicao > 30 ? `<button class="btn" data-tocar="${esc(i.id)}" data-inicio="0">⟲ Do começo</button>` : ''}
+        <button class="btn" data-baixar="${esc(i.id)}">⬇ Baixar para ver depois</button>
+      </div></div>
+    <div id="msg"></div>`;
+  $('veu').classList.add('aberto'); $('veu').scrollTop = 0;
+}
+async function abrirSerie(id) {
+  $('ficha').innerHTML = '<div id="msg" style="grid-column:1/-1">Carregando episódios…</div>';
+  $('veu').classList.add('aberto');
+  const s = await (await fetch('api/cinema/serie/' + id, {cache:'no-store'})).json();
+  const prox = s.temporadas.flatMap(t => t.episodios).find(e => !e.assistido);
+  let temp = prox ? s.temporadas.find(t => t.episodios.includes(prox)).numero : (s.temporadas[0] || {}).numero;
+  const pintar = () => {
+    const t = s.temporadas.find(x => x.numero === temp) || {episodios: []};
+    $('ficha').innerHTML = `
+      <div class="capa" style="background-image:url('${esc(s.capa)}')"></div>
+      <div><h2>${esc(s.nome)}</h2><p>${esc((s.sinopse || '').slice(0, 260))}</p>
+        ${prox ? `<div class="acoes"><button class="btn play" data-tocar="${esc(prox.id)}" data-inicio="${prox.posicao || 0}">▶ ${esc(prox.nome.split(' · ')[0].replace(s.nome, '').trim())}</button></div>` : ''}</div>
+      <div class="temps">${s.temporadas.map(x => `<button class="btn" data-temp="${x.numero}" style="${x.numero === temp ? 'background:#fff;color:#000' : ''}">T${x.numero}</button>`).join('')}</div>
+      <div class="eps">${t.episodios.map(e => `<button class="ep" data-tocar="${esc(e.id)}" data-inicio="${e.posicao || 0}">
+          <span>${esc(e.nome.split(' · ').slice(1).join(' · ') || e.nome)}<small>${esc(e.nome.split(' · ')[0])} · ${min(e.duracao)}${e.posicao > 30 ? ' · parou em ' + min(e.posicao) : ''}</small></span>
+          <span class="ok">${e.assistido ? '✔' : '▶'}</span></button>
+          <button class="btn" data-baixar="${esc(e.id)}" style="justify-self:end;font-size:11px;padding:4px 8px">⬇ baixar</button>`).join('')}</div>
+      <div id="msg"></div>`;
+  };
+  pintar();
+  $('ficha').onclick = ev => { const b = ev.target.closest('[data-temp]'); if (b) { temp = +b.dataset.temp; pintar(); } };
+}
+async function tocar(corpo, rotulo) {
+  if ($('msg')) $('msg').textContent = 'Preparando "' + rotulo + '"… a TV do PS2 muda sozinha em alguns segundos.';
+  try {
+    const r = await (await fetch('api/cinema/tocar', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo)})).json();
+    if ($('msg')) $('msg').textContent = (r.ok ? '▶ ' : '⚠ ') + r.msg;
+  } catch (e) { if ($('msg')) $('msg').textContent = '⚠ sem resposta'; }
+}
+
+$('abas').onclick = ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  aba = b.dataset.aba;
+  document.querySelectorAll('#abas button').forEach(x => x.classList.toggle('ativo', x === b));
+  desenhar(); scrollTo(0, 0);
+};
+$('filtros').onclick = ev => { const b = ev.target.closest('[data-grupo]'); if (b) { grupo = b.dataset.grupo; desenhar(); scrollTo(0, 0); } };
+$('grade').onclick = async ev => {
+  const ap = ev.target.closest('[data-apagar]');
+  if (ap) {
+    ap.textContent = '…';
+    await fetch('api/cinema/apagar', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({slug: ap.dataset.apagar})});
+    return carregarBaixados();
+  }
+  const c = ev.target.closest('.card'); if (!c) return;
+  if (c.dataset.canal) {
+    const ch = dados.canais.find(x => x.id === c.dataset.canal);
+    $('ficha').innerHTML = `<div class="capa" style="background-image:url('${esc(ch.capa)}');aspect-ratio:4/3"></div>
+      <div><h2>${esc(ch.nome)}</h2><div class="info">${esc(ch.grupo)} · ao vivo</div>
+      <div class="acoes"><button class="btn play" data-canal="${esc(ch.id)}">▶ Assistir ao vivo</button></div></div><div id="msg"></div>`;
+    $('veu').classList.add('aberto');
+    return;
+  }
+  const lista = aba === 'canais' ? [] : dados[aba];
+  const i = lista.find(x => x.id === c.dataset.id);
+  if (i.tipo === 'Series') abrirSerie(i.id); else abrirItem(i);
+};
+$('veu').addEventListener('click', async ev => {
+  const bx = ev.target.closest('[data-baixar]');
+  if (bx) {
+    ev.stopPropagation();
+    bx.textContent = '…';
+    try {
+      const r = await (await fetch('api/cinema/baixar', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id: bx.dataset.baixar})})).json();
+      bx.textContent = r.ok ? '✔ na fila' : '⚠';
+      if ($('msg')) $('msg').textContent = r.msg;
+    } catch (e) { bx.textContent = '⚠'; }
+    return carregarBaixados();
+  }
+  const b = ev.target.closest('[data-tocar],[data-canal]');
+  if (b && b.dataset.canal) return tocar({canal: b.dataset.canal}, b.closest('.ficha').querySelector('h2').textContent);
+  if (b) return tocar({id: b.dataset.tocar, inicio: +b.dataset.inicio || 0}, b.textContent.trim());
+  if (ev.target === $('veu')) $('veu').classList.remove('aberto');
+});
+$('fechar').onclick = () => $('veu').classList.remove('aberto');
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape') $('veu').classList.remove('aberto'); });
+carregar();
+carregarBaixados();
+setInterval(() => { if (aba === 'baixados') carregarBaixados(); }, 5000);   // progresso só quando a aba está aberta
+</script>
+<script src="temperatura.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+Termux v0.118.3 e Termux:Boot v0.8.1 (GPLv3), builds oficiais do GitHub (github.com/termux/termux-app, github.com/termux/termux-boot).
+Código-fonte nesses repositórios. Baixados em 17/10/2026 com SHA-256 conferido.
