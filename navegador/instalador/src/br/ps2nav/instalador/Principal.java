@@ -81,7 +81,7 @@ public class Principal extends Activity {
         titulo(raiz, "Servidor em nuvem (opcional)", 18);
         texto(raiz, "O PC com a sua coleção (servidor/instalar.sh mostra o endereço e a chave). Sem ele, a TV box "
                 + "mostra só os jogos e vídeos dela.");
-        campoServidor = campo(raiz, "Endereço (ex.: http://192.168.0.10:8781)", "");
+        campoServidor = campo(raiz, "Endereço(s), separados por vírgula (ex.: http://192.168.0.10:8781, https://meu.dominio)", "");
         campoChave = campo(raiz, "Chave", "");
         botao(raiz, "Salvar servidor na TV box", new Runnable() { public void run() { tarefa(new Tarefa() {
             public void rodar() throws Exception {

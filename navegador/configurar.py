@@ -100,9 +100,10 @@ def ip_auto():
 
 def servidor(url, chave):
     c = ler()
-    url = url.strip().rstrip('/')
-    m = re.match(r'^http://([^/:]+):8781$', url)
-    c['notebook'] = {'urls': [url] if url else [], 'chave': chave.strip(),
+    # vários endereços separados por vírgula/espaço (ex.: o de casa e o https), tentados nessa ordem
+    urls = [u.strip().rstrip('/') for u in re.split(r'[,\s]+', url) if u.strip()]
+    m = next((re.match(r'^http://([^/:]+):8781$', u) for u in urls if re.match(r'^http://([^/:]+):8781$', u)), None)
+    c['notebook'] = {'urls': urls, 'chave': chave.strip(),
                      'casa': f'http://{m.group(1)}:8770' if m else ''}
     gravar(CONFIG, json.dumps(c, ensure_ascii=False, indent=1) + '\n', 0o600)
     aplicar()

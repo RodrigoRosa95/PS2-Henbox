@@ -213,8 +213,9 @@ public class Caixa {
     void configurarServidor(String url, String chave) throws IOException {
         url = url.trim();
         chave = chave.trim();
-        if (url.length() > 0 && !url.matches("https?://[A-Za-z0-9.\\-]+(:\\d+)?/?"))
-            throw new IOException("endereço inválido (ex.: http://192.168.0.10:8781 ou https://meu.dominio)");
+        for (String u : url.split("[,\\s]+"))
+            if (u.length() > 0 && !u.matches("https?://[A-Za-z0-9.\\-]+(:\\d+)?/?"))
+                throw new IOException("endereço inválido: " + u + " (ex.: http://192.168.0.10:8781, https://meu.dominio)");
         if (!chave.matches("[A-Za-z0-9_\\-]*")) throw new IOException("chave inválida");
         if (uidTermux.length() == 0) uidTermux = su("stat -c %u " + T);
         suTermux("python3 ps2nav/configurar.py servidor " + aspas(url) + " " + aspas(chave) + "; chown -R " + uidTermux

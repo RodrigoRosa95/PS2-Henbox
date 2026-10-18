@@ -165,7 +165,9 @@ jogos da coleção, por isso a de verdade não vai aqui.
    | Endereço | `http://192.168.4.135:8781` | `https://ps2videos.seu-dominio.com` |
    | Chave | a do `videos_https.chave` | a mesma |
 
-   → **Salvar servidor na TV box**. Em casa a box usa a rede local; se não alcançar, o HTTPS.
+   No campo **Endereço**, ponha os dois separados por vírgula
+   (`http://192.168.4.135:8781, https://ps2videos.seu-dominio.com`) e toque em **Salvar servidor na TV box**: a box
+   tenta o de casa primeiro e, se não alcançar, o HTTPS.
 
 Para ver como a loja fica com uma coleção de verdade, abra a
 [vitrine da loja do autor](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb) (só para olhar).
