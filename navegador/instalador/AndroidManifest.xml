@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="br.ps2nav.instalador" android:versionCode="1" android:versionName="1.0">
+    package="br.ps2nav.instalador" android:versionCode="2" android:versionName="1.1">
     <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="23" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- também roda na própria TV box (18/10/2026): aparece no launcher da TV e não exige tela de toque -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <application android:label="Instalador PS2" android:theme="@android:style/Theme.DeviceDefault">
-        <activity android:name=".Principal" android:exported="true" android:windowSoftInputMode="adjustResize">
+        <activity android:name=".Principal" android:exported="true" android:windowSoftInputMode="adjustResize|stateHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
     </application>

@@ -19,12 +19,12 @@ public class Caixa {
     static final String AMB = "export PREFIX=" + P + " HOME=" + H + " PATH=" + P + "/bin:/system/bin LD_LIBRARY_PATH="
             + P + "/lib TMPDIR=" + P + "/tmp LANG=pt_BR.UTF-8; cd " + H + "; ";
 
-    final Adb adb;
+    final Canal adb;
     final AssetManager assets;
     final Adb.Aviso log;
     String uidTermux = "";
 
-    Caixa(Adb adb, AssetManager assets, Adb.Aviso log) {
+    Caixa(Canal adb, AssetManager assets, Adb.Aviso log) {
         this.adb = adb;
         this.assets = assets;
         this.log = log;
@@ -74,6 +74,11 @@ public class Caixa {
                 + " " + H + "/" + nome + "; rm -f " + tmp);
         su("am startservice --user 0 -n com.termux/com.termux.app.RunCommandService -a com.termux.RUN_COMMAND"
                 + " --es com.termux.RUN_COMMAND_PATH " + H + "/" + nome + " --ez com.termux.RUN_COMMAND_BACKGROUND true");
+    }
+
+    /** Instalando na própria box: o Termux e o app do navegador vêm para a frente; o instalador volta à tela. */
+    void voltarAoApp() throws IOException {
+        if (adb instanceof Local) sh("am start -n br.ps2nav.instalador/.Principal >/dev/null 2>&1");
     }
 
     void esperar(long ms) { try { Thread.sleep(ms); } catch (InterruptedException e) { } }
@@ -130,10 +135,12 @@ public class Caixa {
             for (int i = 0; i < 90 && !su("ls " + P + "/bin/bash 2>/dev/null").contains("bash"); i++) esperar(2000);
             if (!su("ls " + P + "/bin/bash 2>/dev/null").contains("bash")) throw new IOException("o Termux não terminou de preparar");
             sh("input keyevent 3");
+            voltarAoApp();
         }
         uidTermux = su("stat -c %u " + T);
         log.aviso("Termux pronto (usuário " + uidTermux + ")");
         su("am start -n com.termux.boot/.BootActivity >/dev/null 2>&1; input keyevent 3");   // o Termux:Boot só vale depois de aberto 1 vez
+        voltarAoApp();
         su("mkdir -p " + H + "/.termux/boot; grep -q allow-external-apps " + H + "/.termux/termux.properties 2>/dev/null"
                 + " || echo allow-external-apps=true >> " + H + "/.termux/termux.properties");
 
@@ -190,6 +197,7 @@ public class Caixa {
         sh("am start -n br.ps2nav/.Inicio");
         esperar(4000);
         rodarNoTermux("iniciar-ps2nav.sh", "exec ~/ps2nav/iniciar.sh");
+        voltarAoApp();
     }
 
     /** Se o IP do PS2 não é da rede do cabo da box, escolhe um livre nela (configurar.py ip-auto); "IP MÁSCARA GW". */

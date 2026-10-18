@@ -6,9 +6,13 @@ só precisa da pasta `APPS/NAVEGADOR`**; todo o resto (Neutrino, loja, servidore
 ## Caminho rápido
 
 1. **Pendrive do PS2:** baixe o [`pendrive.zip`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest/download/pendrive.zip) e descompacte na raiz de um pendrive FAT32.
-2. **Celular:** instale o [`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest/download/InstaladorPS2-publico.apk).
-3. **TV box:** ligue a depuração ADB pela rede. No app: **Procurar TV boxes** → toque na sua → aceite na TV →
-   **Instalar / atualizar tudo**. No fim, o app mostra o IP do PS2; se não for `192.168.4.230`, crie no pendrive o
+2. **Instalador:** instale o [`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest/download/InstaladorPS2-publico.apk).
+3. **TV box**, de um destes jeitos:
+   - **Direto na TV box:** instale o mesmo APK na própria box (pendrive + gerenciador de arquivos, ou
+     `adb install`). Abra **Instalador PS2** no launcher da TV → **Instalar NESTA TV box** (aceite o pedido de root)
+     → **Instalar / atualizar tudo**. Não precisa de celular nem de ADB pela rede.
+   - **Pelo celular:** ligue a depuração ADB pela rede na box. No app do celular: **Procurar TV boxes** → toque na
+     sua → aceite na TV → **Instalar / atualizar tudo**. No fim, o app mostra o IP do PS2; se não for `192.168.4.230`, crie no pendrive o
    `APPS/NAVEGADOR/IPCONFIG.DAT` com a linha que ele mostrar.
 4. **Cabo:** PS2 na porta de rede da TV box (ou os dois no mesmo roteador).
 5. **PS2:** OPL → **Apps** → **Navegador (rede direta)**.

@@ -40,7 +40,7 @@ public class Principal extends Activity {
     LinearLayout achadas;
     EditText campoBox, campoIp, campoMascara, campoGw, campoServidor, campoChave;
     TextView log, estado;
-    Adb adb;
+    Canal adb;
     Caixa caixa;
     String boxConectada = "";
 
@@ -58,6 +58,8 @@ public class Principal extends Activity {
         titulo(raiz, "Instalador PS2 Navegador", 22);
         texto(raiz, "1. Conecte o celular no mesmo Wi-Fi da TV box (com ADB pela rede ligado). 2. Procure ou digite o IP. "
                 + "3. Conecte e aceite \"Permitir depuração\" na TV.");
+        botao(raiz, "Instalar NESTA TV box (este aparelho, com root)", new Runnable() { public void run() { conectarAqui(); } });
+        texto(raiz, "Ou, do celular:");
         botao(raiz, "Procurar TV boxes na rede", new Runnable() { public void run() { procurar(); } });
         achadas = new LinearLayout(this);
         achadas.setOrientation(LinearLayout.VERTICAL);
@@ -133,6 +135,31 @@ public class Principal extends Activity {
             + "    Em algumas boxes fica em Configurações → Sistema → ADB, ou no app \"Configurações\" da própria marca.\n"
             + " 3. Celular e TV box na mesma rede. Procure de novo ou digite o IP (Configurações → Rede da TV box).\n"
             + " 4. Quando conectar, aceite \"Permitir depuração\" na TV e marque \"Sempre permitir\".";
+
+    /** O app rodando na própria TV box (instalado por pendrive/loja de apps): comandos como root, sem ADB. */
+    void conectarAqui() {
+        fila.submit(new Runnable() {
+            public void run() {
+                try {
+                    if (adb != null) adb.fechar();
+                    adb = new Local(getCacheDir());
+                    caixa = new Caixa(adb, getAssets(), new Adb.Aviso() { public void aviso(String s) { escrever(s); } });
+                    if (!caixa.temRoot()) {
+                        escrever("Este aparelho não deu root ao app: aceite o pedido de root (SuperSU/Magisk) e toque de novo.");
+                        caixa = null;
+                        return;
+                    }
+                    boxConectada = "esta TV box";
+                    escrever("Nesta TV box: " + caixa.sh("getprop ro.product.model") + " (Android "
+                            + caixa.sh("getprop ro.build.version.release") + "). Toque em Instalar / atualizar tudo.");
+                    mostrarEstado();
+                } catch (Exception e) {
+                    caixa = null;
+                    escrever("Sem root neste aparelho: " + e.getMessage());
+                }
+            }
+        });
+    }
 
     void conectar() {
         final String ip = lido(campoBox);
@@ -230,7 +257,7 @@ public class Principal extends Activity {
             sb.append('\n');
             sb.append("WebView: ").append(j.optBoolean("webview") ? "ok" : "parado").append(" · página: ")
               .append(j.optBoolean("pagina") ? "ok" : "parada").append('\n');
-            sb.append("Notebook: ").append(j.optString("notebook")).append('\n');
+            sb.append("Servidor em nuvem: ").append(j.optString("notebook")).append('\n');
             sb.append("Espaço livre: ").append(j.optLong("espaco_livre_mb")).append(" MB\n");
             final String ip = ps2.optString("ip");
             ui.post(new Runnable() { public void run() { if (ip.length() > 0) campoIp.setText(ip); } });

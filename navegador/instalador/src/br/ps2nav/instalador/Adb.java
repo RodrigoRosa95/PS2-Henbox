@@ -29,7 +29,7 @@ import java.security.spec.X509EncodedKeySpec;
  * comandos shell: e envio de arquivos por sync:. Um canal por vez, que é o que o instalador precisa.
  * Protocolo: https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/protocol.txt
  */
-public class Adb {
+public class Adb implements Canal {
     static final int CNXN = 0x4e584e43, AUTH = 0x48545541, OPEN = 0x4e45504f, OKAY = 0x59414b4f,
             CLSE = 0x45534c43, WRTE = 0x45545257;
     static final int VERSAO = 0x01000001, MAXDATA = 256 * 1024;
