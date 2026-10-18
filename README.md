@@ -47,7 +47,7 @@ O pacote do instalador também precisa, fora deste repositório: `neutrino/` e `
 
 ## Avisos
 
-- Use só cópias dos seus próprios jogos. Nenhum jogo, ROM ou capa está neste repositório.
+- Use só cópias dos seus próprios jogos. Nenhum jogo ou ROM está neste repositório; as capas nas telas são só ilustração.
 - O acesso de fora de casa passa por um túnel Cloudflare protegido por chave; os termos do Cloudflare restringem
   servir vídeo pelo túnel gratuito.
 - A TV box precisa de root; o instalador usa o ADB pela rede.
