@@ -21,6 +21,8 @@ cp -r ../../neutrino "$T/ps2nav/ps2/neutrino"
 cat > "$T/ps2nav/ps2/neutrino/LEIA-ME.txt" <<'AVISO'
 Neutrino v1.8.0 (c) Maximus32 / rickgaiser, sem modificações — licença Academic Free License 3.0 (AFL-3.0).
 Código-fonte e licença: https://github.com/rickgaiser/neutrino
+Acrescentados: config/pademu.toml e modules/bt_pademu.irx = PadEmu do Open PS2 Loader (AFL-3.0,
+https://github.com/ps2homebrew/Open-PS2-Loader, modules/pademu), para o DualShock 3/4 por Bluetooth nos jogos.
 As configurações em config/ ganham o IP do PS2 (configurar.py).
 AVISO
 mkdir -p "$T/udpfs_server"; cp -r ../../udpfs_server/udpfs_server.py ../../udpfs_server/compressed_iso "$T/udpfs_server/"

@@ -1,0 +1,4 @@
+PadEmu (DualShock 3/4 por Bluetooth emulando DualShock 2) do Open PS2 Loader, cópia de
+~/loja-snes-mundial/athena/iop_modules/pademu (AthenaEnv, que trouxe do OPL: https://github.com/ps2homebrew/Open-PS2-Loader,
+modules/pademu). Mudança: sem o smsutils (o Neutrino não carrega esse módulo do OPL). 18/10/2026: para usar o DS4 nos
+jogos abertos pelo Neutrino ("Jogar pela rede").

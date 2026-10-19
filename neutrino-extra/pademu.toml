@@ -1,0 +1,17 @@
+# Name of loaded config, to show to user
+name = "PadEmu: DualShock 3/4 por Bluetooth (como o OPL)"
+
+# Acrescentado em 18/10/2026 para o ps2GamesCLoudinOPl ("Jogar pela rede" com -cfg=pademu):
+# o bt_pademu.irx do Open PS2 Loader (modules/pademu) fica no ambiente do jogo, intercepta o SIO2MAN e entrega os
+# botões do DualShock 3/4 pareado com o adaptador Bluetooth USB como se fosse um DualShock 2 na porta 1.
+# Precisa do driver USB (usbd_mini) também no ambiente do jogo.
+[[module]]
+file = "usbd_mini.irx"
+# menos memória de IOP que o padrão do 'mini' (a rede do udpfs já ocupa uma parte)
+args = ["dev=4", "ed=8", "gtd=16", "itd=16", "hub=2", "port=4", "thpri=7,8"]
+env = ["EE"]
+[[module]]
+file = "bt_pademu.irx"
+# bytes: portas ligadas (bit 0 = porta 1), vibração (bit 0 = porta 1)
+args = ["\u0001\u0001"]
+env = ["EE"]

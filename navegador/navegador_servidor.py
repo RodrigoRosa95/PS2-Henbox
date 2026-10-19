@@ -419,7 +419,12 @@ class Sessao:
         nome = os.path.basename(iso)
         if not self.aberto():
             return 'o navegador não está aberto no PS2'
-        self.enfileirar(1, 'host:neutrino/neutrino.elf', f'-bsd=udpfs|-dvd=udpfs:DVD/{nome}', '__neutrino__', 'abrindo')
+        args = f'-bsd=udpfs|-dvd=udpfs:DVD/{nome}'
+        # DualShock 3/4 por Bluetooth no jogo (18/10/2026): PadEmu do OPL via config/pademu.toml, se existir (apagar o
+        # arquivo desliga); o pedido para o PS2 tem no máximo 127 bytes, então ISO de nome longo vai sem ele
+        if os.path.exists(os.path.join(PASTA_PS2, 'neutrino', 'config', 'pademu.toml')) and len(args) + 12 <= 127:
+            args += '|-cfg=pademu'
+        self.enfileirar(1, 'host:neutrino/neutrino.elf', args, '__neutrino__', 'abrindo')
         return 'ok'
 
     def enfileirar(self, op, origem, destino, rotulo, fase):
