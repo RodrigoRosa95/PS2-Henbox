@@ -8,7 +8,7 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <application android:label="Instalador PS2" android:theme="@android:style/Theme.DeviceDefault">
-        <activity android:name=".Principal" android:exported="true" android:windowSoftInputMode="adjustResize|stateHidden">
+        <activity android:name=".Principal" android:exported="true" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize|stateHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

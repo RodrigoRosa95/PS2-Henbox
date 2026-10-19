@@ -169,6 +169,14 @@ jogos da coleção, por isso a de verdade não vai aqui.
    (`http://192.168.4.135:8781, https://ps2videos.seu-dominio.com`) e toque em **Salvar servidor na TV box**: a box
    tenta o de casa primeiro e, se não alcançar, o HTTPS.
 
+   | Servidor preenchido (a chave aparece só como pontos) | Registro da instalação na TV box |
+   | --- | --- |
+   | ![Servidor em nuvem preenchido](telas/5-instalador-servidor.png) | ![Registro da instalação](telas/6-instalador-registro.png) |
+
+   Sem tocar na tela (pelo ADB, ou numa TV sem toque):
+   `am start -n br.ps2nav.instalador/.Principal --es servidor "http://…:8781, https://…" --es chave CHAVE --es acao instalar-aqui`
+   (o registro também fica em `/data/data/br.ps2nav.instalador/files/registro.txt`).
+
 Para ver como a loja fica com uma coleção de verdade, abra a
 [vitrine da loja do autor](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb) (só para olhar).
 

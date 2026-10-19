@@ -43,11 +43,12 @@ public class Principal extends Activity {
     Canal adb;
     Caixa caixa;
     String boxConectada = "";
+    ScrollView rolagem;
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
-        ScrollView rolagem = new ScrollView(this);
+        rolagem = new ScrollView(this);
         LinearLayout raiz = new LinearLayout(this);
         raiz.setOrientation(LinearLayout.VERTICAL);
         int m = dp(16);
@@ -83,6 +84,8 @@ public class Principal extends Activity {
                 + "mostra só os jogos e vídeos dela.");
         campoServidor = campo(raiz, "Endereço(s), separados por vírgula (ex.: http://192.168.0.10:8781, https://meu.dominio)", "");
         campoChave = campo(raiz, "Chave", "");
+        campoServidor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        campoChave.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);   // não aparece na tela
         botao(raiz, "Salvar servidor na TV box", new Runnable() { public void run() { tarefa(new Tarefa() {
             public void rodar() throws Exception {
                 caixa.configurarServidor(lido(campoServidor), lido(campoChave));
@@ -110,6 +113,63 @@ public class Principal extends Activity {
         log = texto(raiz, "");
         log.setTypeface(Typeface.MONOSPACE);
         log.setTextSize(12);
+        // registro da última execução (o app pode ter sido fechado no meio, ou a tela recriada)
+        try {
+            java.util.List<String> linhas = new java.util.ArrayList<String>();
+            java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader(new java.io.File(getFilesDir(), "registro.txt")));
+            for (String l; (l = r.readLine()) != null; ) linhas.add(l);
+            r.close();
+            StringBuilder sb = new StringBuilder();
+            for (String l : linhas.subList(Math.max(0, linhas.size() - 60), linhas.size())) sb.append(l).append('\n');
+            log.setText(sb);
+        } catch (Exception e) { }
+        if (b == null) {   // a tela recriada (girar, teclado, voltar do Termux) não repete o comando
+            porIntent(getIntent().getExtras());
+            getIntent().removeExtra("acao");
+        }
+    }
+
+    /** Comandos sem tocar na tela (ADB, TV sem toque — 18/10/2026):
+     *  am start -n br.ps2nav.instalador/.Principal --es servidor "URL[, URL]" --es chave CHAVE --es acao instalar-aqui
+     *  acao: instalar-aqui (instala nesta box), servidor-aqui (só salva o servidor nesta box), conectar-aqui;
+     *  rolar: servidor | fim (mostra a parte do servidor ou o registro). */
+    @Override
+    protected void onNewIntent(android.content.Intent i) {   // singleTask: am start com o app aberto cai aqui
+        super.onNewIntent(i);
+        porIntent(i.getExtras());
+    }
+
+    void porIntent(Bundle x) {
+        if (x == null) return;
+        if (x.getString("servidor") != null) campoServidor.setText(x.getString("servidor"));
+        if (x.getString("chave") != null) campoChave.setText(x.getString("chave"));
+        final String rolar = x.getString("rolar", "");
+        if (rolar.length() > 0) ui.postDelayed(new Runnable() { public void run() {
+            if (rolar.equals("fim")) rolagem.fullScroll(View.FOCUS_DOWN);
+            else rolagem.smoothScrollTo(0, Math.max(0, campoServidor.getTop() - dp(120)));
+        } }, 800);
+        String acao = x.getString("acao", "");
+        if (!acao.endsWith("-aqui")) return;
+        conectarAqui();
+        if (acao.equals("conectar-aqui")) return;
+        final boolean so_servidor = acao.equals("servidor-aqui");
+        fila.submit(new Runnable() {
+            public void run() {
+                if (caixa == null) return;
+                try {
+                    if (!so_servidor) caixa.instalar();   // instala antes: numa box nova o configurar.py ainda não existe
+                    if (so_servidor || lido(campoServidor).length() > 0) {
+                        caixa.configurarServidor(lido(campoServidor), lido(campoChave));
+                        escrever("Servidor salvo. Reiniciando os serviços…");
+                        caixa.iniciar();
+                        caixa.esperar(20000);
+                    }
+                    mostrarEstado();
+                } catch (Exception e) {
+                    escrever("Erro: " + e.getMessage());
+                }
+            }
+        });
     }
 
     interface Tarefa { void rodar() throws Exception; }
@@ -309,6 +369,12 @@ public class Principal extends Activity {
     String lido(EditText e) { return e.getText().toString().trim(); }
 
     void escrever(final String s) {
+        // também em arquivo (o logcat de algumas boxes vem desligado): files/registro.txt, lido pelo ADB com su
+        try {
+            java.io.FileWriter f = new java.io.FileWriter(new java.io.File(getFilesDir(), "registro.txt"), true);
+            f.write(new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date()) + " " + s + "\n");
+            f.close();
+        } catch (Exception e) { }
         ui.post(new Runnable() {
             public void run() {
                 log.append(s + "\n");

@@ -46,7 +46,13 @@ public class Caixa {
     boolean instalado(String pacote) throws IOException { return sh("pm path " + pacote).startsWith("package:"); }
 
     void enviarAsset(String nome, String destino) throws IOException {
-        InputStream i = assets.open(nome);
+        InputStream i;
+        try {
+            i = assets.open(nome);
+        } catch (IOException e) {
+            if (!nome.endsWith(".gz")) throw e;
+            i = assets.open(nome.substring(0, nome.length() - 3));   // o aapt descompacta .gz e tira a extensão
+        }
         try {
             adb.enviarArquivo(i, destino, 0644, null);
         } finally {
@@ -147,7 +153,7 @@ public class Caixa {
         log.aviso("Copiando os servidores do navegador…");
         enviarAsset("ps2nav.tar.gz", "/data/local/tmp/ps2nav.tar.gz");
         su("rm -rf /data/local/tmp/ps2nav-novo; mkdir -p /data/local/tmp/ps2nav-novo; " + AMB
-                + "tar -xzf /data/local/tmp/ps2nav.tar.gz -C /data/local/tmp/ps2nav-novo");
+                + "tar -xf /data/local/tmp/ps2nav.tar.gz -C /data/local/tmp/ps2nav-novo");   // o tar reconhece se é .gz ou não
         // config.json de uma instalação anterior fica (IP do PS2 trocado pelo usuário)
         su("N=/data/local/tmp/ps2nav-novo; mkdir -p " + H + "/ps2nav; "
                 + "[ -f " + H + "/ps2nav/config.json ] && rm -f $N/ps2nav/config.json; "
