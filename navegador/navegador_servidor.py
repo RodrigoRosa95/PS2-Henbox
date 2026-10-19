@@ -444,6 +444,11 @@ class Sessao:
     def proximo_pedido(self):
         self.pedido = self.fila.pop(0) if self.fila else None
         if not self.pedido:
+            # fila vazia: tira o pedido entregue, senão um navegador aberto depois (outra sessão) o faria de novo
+            try:
+                os.remove(os.path.join(PASTA_PS2, 'pedido.bin'))
+            except OSError:
+                pass
             return
         p = self.pedido
         gravar(os.path.join(PASTA_PS2, 'pedido.bin'), b'PSP1' + struct.pack('<II', p['id'], p['tamanho'])
@@ -503,6 +508,16 @@ class Sessao:
                 continue
             if not self.aberto():
                 log('PS2 conectado (navegador aberto)')
+                # sessão nova do navegador: um "abrir ELF/jogo" (op 1) ou vídeo (op 2) já foi entregue à sessão
+                # anterior — se ficasse no pedido.bin, o navegador recém-aberto abria o jogo de novo sozinho (18/10/2026)
+                if self.pedido and self.pedido['op'] in (1, 2):
+                    log('pedido antigo descartado:', self.pedido['fase'], self.pedido['destino'].decode())
+                    self.pedido = None
+                    try:
+                        os.remove(os.path.join(PASTA_PS2, 'pedido.bin'))
+                    except OSError:
+                        pass
+                    self.proximo_pedido()
                 self.n_teclas = None
                 self.ra_copiado = False   # pode ser outro pendrive
                 threading.Thread(target=self.enviar_tela, args=(True,), daemon=True).start()
