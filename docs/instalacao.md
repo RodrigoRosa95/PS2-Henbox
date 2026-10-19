@@ -177,6 +177,23 @@ jogos da coleção, por isso a de verdade não vai aqui.
    `am start -n br.ps2nav.instalador/.Principal --es servidor "http://…:8781, https://…" --es chave CHAVE --es acao instalar-aqui`
    (o registro também fica em `/data/data/br.ps2nav.instalador/files/registro.txt`).
 
+No app, com os dois endereços e a chave (a chave aparece como pontos):
+
+![Servidor em nuvem preenchido no instalador](telas/5-instalador-servidor.png)
+
+E o registro de uma instalação completa feita direto na TV box, já salvando o servidor:
+
+![Registro da instalação](telas/6-instalador-registro.png)
+
+Comandos sem tocar na tela (ADB), úteis numa TV sem mouse:
+
+```
+adb shell am start -n br.ps2nav.instalador/.Principal --es acao instalar-aqui \
+    --es servidor "http://192.168.0.10:8781, https://ps2videos.seu-dominio.com" --es chave SUA_CHAVE
+```
+
+(`acao`: `instalar-aqui` instala tudo nesta box; `servidor-aqui` só salva o servidor; `conectar-aqui` só mostra o estado.)
+
 Para ver como a loja fica com uma coleção de verdade, abra a
 [vitrine da loja do autor](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb) (só para olhar).
 
