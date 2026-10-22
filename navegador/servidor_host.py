@@ -15,6 +15,11 @@ Protocolo (big-endian, ps2link/include/hostlink.h): cabeçalho cmd:u32 len:u16 (
   remove/rmdir name[256], mkdir mode name[256], getstat name[256], dopen/dread/dclose
 Uso: servidor_host.py [IP do PS2]   (padrão 192.168.4.230)
 
+PS2Link abre o navegador (22/10/2026): se o PS2 estiver no PS2Link (porta TCP 0x4711, o mesmo protocolo de arquivos),
+este programa faz o papel do ps2client — serve host: e manda o comando execee (UDP 0x4712) "host:navegador.elf rede".
+O navegador aberto assim é o caminho que abre os jogos pela rede (aberto direto pelo OPL, o Neutrino travava).
+PS2_AUTO_NAVEGADOR=0 desliga.
+
 Vídeos remotos (17/10/2026, TV box fora de casa): host:video/remoto/<arquivo> é lido do videos_https.py do notebook,
 pelos endereços de remoto.json ({"urls": ["http://192.168.4.135:8781", "https://ps2videos.rodrigoflix.com"],
 "chave": "..."}, o primeiro que responder). Uma thread por arquivo busca pedaços de 512 KB à frente (até 4 MB), para
@@ -24,6 +29,9 @@ import http.client, json, os, re, socket, stat, struct, subprocess, sys, threadi
 
 PS2 = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('PS2_IP', '192.168.4.230')
 PORTA = 0x4721
+PORTA_PS2LINK, PORTA_CMD = 0x4711, 0x4712
+EXECEE = 0xBABE0203
+AUTO_NAVEGADOR = os.environ.get('PS2_AUTO_NAVEGADOR', '1') != '0'
 RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ps2')
 CAB = struct.Struct('>IH')
 REMOTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'remoto.json')
@@ -299,11 +307,13 @@ def procurar_ps2():
     def tentar(ip):
         if achado:
             return
-        try:
-            with socket.create_connection((ip, PORTA), timeout=1.2):
-                achado.append(ip)
-        except OSError:
-            pass
+        for porta in (PORTA, PORTA_PS2LINK):   # navegador aberto ou PS2Link esperando
+            try:
+                with socket.create_connection((ip, porta), timeout=1.2):
+                    achado.append(ip)
+                    return
+            except OSError:
+                pass
     proprio = PS2.rsplit('.', 1)[0] + '.'   # a rede do IP configurado vem primeiro
     for prefixo in [proprio] + [p for p in redes_locais() if p != proprio]:
         ts = [threading.Thread(target=tentar, args=(prefixo + str(i),), daemon=True) for i in range(1, 255)]
@@ -316,6 +326,36 @@ def procurar_ps2():
     return None
 
 
+def execee(ip, *args):
+    """O comando execee do ps2client: cmd, len, argc e os argumentos separados por zero (256 bytes)."""
+    dados = b''.join(a.encode() + b'\0' for a in args).ljust(256, b'\0')[:256]
+    pacote = struct.pack('>IHi', EXECEE, 4 + 2 + 4 + 256, len(args)) + dados
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as u:
+        u.sendto(pacote, (ip, PORTA_CMD))
+
+
+def pelo_ps2link():
+    """PS2 no PS2Link: serve host: na porta dele e manda abrir o navegador. True se encontrou o PS2Link."""
+    try:
+        s = socket.create_connection((PS2, PORTA_PS2LINK), timeout=1.5)
+    except OSError:
+        return False
+    s.settimeout(20)
+    s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    log('PS2Link encontrado: abrindo o navegador por ele')
+    threading.Timer(1.0, execee, args=(PS2, 'host:navegador.elf', 'rede')).start()
+    try:
+        servir(s)   # até o navegador reiniciar o IOP (a conexão cai) e ligar a rede própria dele
+    except (ConnectionError, OSError) as e:
+        log('PS2Link: conexão encerrada:', e)
+    finally:
+        s.close()
+    return True
+
+
+_ultimo_ps2link = [0]
+
+
 def main():
     global PS2
     log(f'esperando o navegador no PS2 ({PS2}:{PORTA:#x}, ou procurando na rede), servindo {RAIZ}')
@@ -326,6 +366,11 @@ def main():
             falhas = 0
         except OSError:
             falhas += 1
+            if AUTO_NAVEGADOR and time.time() - _ultimo_ps2link[0] > 30 and pelo_ps2link():
+                _ultimo_ps2link[0] = time.time()   # não insiste se o navegador não subir: espera 30 s
+                falhas = 0
+                time.sleep(2)
+                continue
             if falhas % 5 == 0:   # ~10 s sem resposta no IP conhecido: procura nas redes locais
                 ip = procurar_ps2()
                 if ip and ip != PS2:

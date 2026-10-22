@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chaves de acesso</title>
+<!-- Gerador de chaves do jogo em nuvem (22/10/2026): API /api/chaves do servidor.py (chaves.py). -->
+<style>
+  :root { --fundo:#0d1117; --cartao:#161b22; --borda:#30363d; --texto:#e6edf3; --fraco:#8b949e;
+          --verde:#3fb950; --vermelho:#f85149; --amarelo:#d29922; --azul:#2f81f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--texto); font:15px/1.4 system-ui, sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:22px; margin:0 0 4px; display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  h1 a { color:#58a6ff; font-size:14px; font-weight:400; text-decoration:none; }
+  .sub { color:var(--fraco); margin:0 0 18px; }
+  .cartao { background:var(--cartao); border:1px solid var(--borda); border-radius:10px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  .form { display:grid; grid-template-columns:1fr 150px auto; gap:10px; }
+  @media (max-width:600px) { .form { grid-template-columns:1fr; } }
+  input, select { width:100%; padding:9px 10px; border-radius:8px; border:1px solid var(--borda); background:var(--fundo);
+                  color:var(--texto); font:inherit; }
+  button { padding:9px 14px; border:1px solid var(--borda); border-radius:8px; background:#21262d; color:var(--texto);
+           font:inherit; cursor:pointer; white-space:nowrap; }
+  button.prim { background:var(--azul); border-color:var(--azul); color:#fff; font-weight:600; }
+  button.perigo { color:var(--vermelho); }
+  button:disabled { opacity:.5; cursor:default; }
+  .nova { display:none; margin-top:14px; border-top:1px solid var(--borda); padding-top:14px; }
+  .nova.vis { display:block; }
+  textarea { width:100%; min-height:190px; padding:10px; border-radius:8px; border:1px solid var(--borda);
+             background:var(--fundo); color:var(--texto); font:13px/1.45 ui-monospace, monospace; resize:vertical; }
+  .acoes { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:9px 6px; border-bottom:1px solid var(--borda); vertical-align:middle; }
+  th { color:var(--fraco); font-weight:500; font-size:13px; }
+  td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .estado { font-size:12px; padding:2px 8px; border-radius:10px; border:1px solid currentColor; white-space:nowrap; }
+  .ativa { color:var(--verde); } .revogada { color:var(--vermelho); } .vencida { color:var(--amarelo); }
+  .vazio { color:var(--fraco); padding:12px 0; }
+  .aviso { color:var(--fraco); font-size:13px; margin:12px 0 0; }
+  #msg { min-height:20px; margin-top:8px; font-size:14px; }
+  @media (max-width:600px) {
+    thead { display:none; }
+    tr { display:grid; grid-template-columns:1fr auto; gap:4px 10px; padding:10px 0; border-bottom:1px solid var(--borda); }
+    td { border:0; padding:0; }
+    td.botoes { grid-column:1 / -1; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>🔑 Chaves de acesso <a href="index.html">← Painel PS2</a></h1>
+  <p class="sub">Cada chave libera uma TV box para jogar pela rede (HTTPS) a partir do seu servidor. Revogar corta o acesso na hora.</p>
+
+  <div class="cartao">
+    <h2>Gerar chave</h2>
+    <div class="form">
+      <input id="nome" maxlength="40" placeholder="De quem é? (ex.: TV box do João)">
+      <select id="dias">
+        <option value="0">Sem validade</option>
+        <option value="1">1 dia</option>
+        <option value="7">7 dias</option>
+        <option value="30" selected>30 dias</option>
+        <option value="90">90 dias</option>
+        <option value="365">1 ano</option>
+      </select>
+      <button class="prim" id="gerar">Gerar</button>
+    </div>
+    <div id="msg"></div>
+    <div class="nova" id="nova">
+      <h2 id="nova-titulo">Chave criada</h2>
+      <textarea id="texto" readonly></textarea>
+      <div class="acoes">
+        <button id="copiar">📋 Copiar instruções</button>
+        <button id="copiar-chave">🔑 Copiar só a chave</button>
+      </div>
+    </div>
+    <p class="aviso">A chave dá acesso à loja, aos vídeos, às ROMs e aos ISOs do servidor, e cada jogo sai pelo upload da sua internet. Os jogos comerciais têm direitos autorais: use para as suas próprias TV boxes.</p>
+  </div>
+
+  <div class="cartao">
+    <h2>Chaves</h2>
+    <table>
+      <thead><tr><th>Nome</th><th>Estado</th><th>Validade</th><th>Último uso</th><th>Servido</th><th></th></tr></thead>
+      <tbody id="lista"><tr><td colspan="6" class="vazio">Carregando…</td></tr></tbody>
+    </table>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let info = {chaves: [], servidor: '', downloads: ''};
+
+const data = t => t ? new Date(t * 1000).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', year: '2-digit',
+                                                                     hour: '2-digit', minute: '2-digit'}) : '—';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+
+function instrucoes(c) {
+  return `🎮 Acesso ao jogo em nuvem do PS2 (${c.nome})\n\n` +
+    `Servidor: ${info.servidor}\nChave: ${c.chave}\n` +
+    (c.expira ? `Válida até: ${data(c.expira)}\n` : '') +
+    `\nComo instalar:\n` +
+    `1. Baixe o pendrive.zip e o InstaladorPS2-publico.apk em ${info.downloads}\n` +
+    `2. Descompacte o pendrive.zip num pendrive FAT32 e ligue no PS2 (abre pelo OPL → Apps → Navegador). ` +
+    `Se o IP do seu PS2 não for 192.168.4.230, crie APPS/NAVEGADOR/IPCONFIG.DAT com "IP MÁSCARA GATEWAY".\n` +
+    `3. Instale o app na TV box (Android) e, quando ele pedir, informe o servidor e a chave acima.\n` +
+    `4. No PS2, abra o Navegador, entre na loja e use "☁ Jogar pela rede".\n\n` +
+    `Teste antes a sua internet: ${info.servidor}/teste#${encodeURIComponent(c.chave)}`;
+}
+
+function mostrarNova(c) {
+  $('nova-titulo').textContent = `Chave de ${c.nome}`;
+  $('texto').value = instrucoes(c);
+  $('copiar-chave').dataset.chave = c.chave;
+  $('nova').classList.add('vis');
+}
+
+async function carregar() {
+  try {
+    info = await (await fetch('/api/chaves', {cache: 'no-store'})).json();
+  } catch (e) {
+    $('lista').innerHTML = '<tr><td colspan="6" class="vazio">Não deu para ler as chaves.</td></tr>';
+    return;
+  }
+  if (info.erro) { $('lista').innerHTML = `<tr><td colspan="6" class="vazio">${esc(info.erro)}</td></tr>`; return; }
+  const cs = [...info.chaves].reverse();
+  $('lista').innerHTML = cs.length ? cs.map(c => `
+    <tr>
+      <td><b>${esc(c.nome)}</b><br><span style="color:var(--fraco);font-size:12px">criada ${data(c.criada)}</span></td>
+      <td><span class="estado ${c.estado}">${c.estado}</span></td>
+      <td class="num">${c.expira ? data(c.expira) : 'sem validade'}</td>
+      <td class="num">${data(c.ultimo_uso)}</td>
+      <td class="num">${c.mb.toLocaleString('pt-BR')} MB</td>
+      <td class="botoes"><div class="acoes" style="margin:0">
+        <button data-ver="${c.id}">Instruções</button>
+        ${c.ativa ? `<button class="perigo" data-acao="revogar" data-id="${c.id}">Revogar</button>`
+                  : `<button data-acao="reativar" data-id="${c.id}">Reativar</button>
+                     <button class="perigo" data-acao="apagar" data-id="${c.id}">Apagar</button>`}
+      </div></td>
+    </tr>`).join('') : '<tr><td colspan="6" class="vazio">Nenhuma chave gerada ainda.</td></tr>';
+}
+
+$('gerar').addEventListener('click', async () => {
+  const nome = $('nome').value.trim();
+  if (!nome) { $('msg').textContent = 'Dê um nome para saber de quem é a chave.'; $('nome').focus(); return; }
+  $('gerar').disabled = true;
+  const r = await (await fetch('/api/chaves/criar', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                                     body: JSON.stringify({nome, dias: +$('dias').value})})).json();
+  $('gerar').disabled = false;
+  if (!r.ok) { $('msg').textContent = r.msg || 'Não deu para criar.'; return; }
+  $('msg').textContent = '';
+  $('nome').value = '';
+  await carregar();
+  mostrarNova(r.chave);
+});
+
+// sem confirm(): revogar/apagar pedem um segundo toque (o mesmo jeito da loja)
+let armado = null;
+$('lista').addEventListener('click', async ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  if (b.dataset.ver) { mostrarNova(info.chaves.find(c => c.id === b.dataset.ver)); $('nova').scrollIntoView({behavior: 'smooth'}); return; }
+  const {acao, id} = b.dataset;
+  if (acao !== 'reativar' && armado !== b) {
+    armado = b; b.dataset.texto = b.textContent; b.textContent = 'Toque de novo';
+    setTimeout(() => { if (armado === b) { b.textContent = b.dataset.texto; armado = null; } }, 3000);
+    return;
+  }
+  armado = null;
+  b.disabled = true;
+  await fetch('/api/chaves/' + acao, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id})});
+  carregar();
+});
+
+async function copiar(texto, botao) {
+  try { await navigator.clipboard.writeText(texto); }
+  catch (e) { $('texto').select(); document.execCommand('copy'); }
+  const antes = botao.textContent; botao.textContent = '✔ Copiado'; setTimeout(() => botao.textContent = antes, 1500);
+}
+$('copiar').addEventListener('click', e => copiar($('texto').value, e.target));
+$('copiar-chave').addEventListener('click', e => copiar(e.target.dataset.chave, e.target));
+
+carregar();
+</script>
+</body>
+</html>

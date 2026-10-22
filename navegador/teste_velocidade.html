@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste do jogo em nuvem</title>
+<!-- Teste de velocidade do "Jogar pela rede" (22/10/2026): mede, no navegador (ex.: celular no 4G), o que a TV box
+     teria lendo um ISO pelo videos_https.py — blocos de 1 MB como o udpfs_nuvem.py (3 à frente) e saltos aleatórios.
+     A chave vem do endereço (#chave, não vai para o servidor no link) ou do campo. Resultado → POST /teste/resultado. -->
+<style>
+  :root { --fundo:#0d1117; --cartao:#161b22; --borda:#30363d; --texto:#e6edf3; --fraco:#8b949e;
+          --verde:#3fb950; --vermelho:#f85149; --amarelo:#d29922; --azul:#2f81f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fundo); color:var(--texto); font:16px/1.45 system-ui, sans-serif; }
+  main { max-width:560px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  p { color:var(--fraco); margin:0 0 16px; }
+  .cartao { background:var(--cartao); border:1px solid var(--borda); border-radius:10px; padding:16px; margin-bottom:14px; }
+  input { width:100%; padding:10px; border-radius:8px; border:1px solid var(--borda); background:var(--fundo);
+          color:var(--texto); font:inherit; }
+  button { width:100%; margin-top:12px; padding:12px; border:0; border-radius:8px; background:var(--azul); color:#fff;
+           font:600 16px system-ui, sans-serif; }
+  button:disabled { opacity:.5; }
+  .linha { display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px solid var(--borda); }
+  .linha:last-child { border-bottom:0; }
+  .linha span:first-child { color:var(--fraco); }
+  .linha b { font-variant-numeric:tabular-nums; }
+  .barra { height:8px; background:var(--fundo); border-radius:4px; overflow:hidden; margin-top:10px; }
+  .barra div { height:100%; width:0; background:var(--azul); transition:width .2s; }
+  #veredito { font-size:18px; font-weight:600; }
+  .bom { color:var(--verde); } .medio { color:var(--amarelo); } .ruim { color:var(--vermelho); }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎮 Teste do jogo em nuvem</h1>
+  <p>Mede a velocidade com que uma TV box nesta rede leria um jogo do servidor. No celular, desligue o Wi-Fi para testar o 4G. Usa uns 30 MB de dados.</p>
+
+  <div class="cartao" id="cx-chave">
+    <label for="chave" style="color:var(--fraco)">Chave de acesso</label>
+    <input id="chave" autocomplete="off" spellcheck="false" placeholder="cole a chave aqui">
+    <button id="iniciar">Iniciar teste</button>
+  </div>
+
+  <div class="cartao" id="cx-andamento" hidden>
+    <div id="fase">Preparando…</div>
+    <div class="barra"><div id="progresso"></div></div>
+  </div>
+
+  <div class="cartao" id="cx-resultado" hidden>
+    <div id="veredito"></div>
+    <div style="margin-top:10px">
+      <div class="linha"><span>Velocidade contínua</span><b id="r-vel">—</b></div>
+      <div class="linha"><span>Bloco novo (salto no disco)</span><b id="r-lat">—</b></div>
+      <div class="linha"><span>Primeiro byte</span><b id="r-ttfb">—</b></div>
+      <div class="linha"><span>Rede informada</span><b id="r-rede">—</b></div>
+      <div class="linha"><span>Cloudflare</span><b id="r-cf">—</b></div>
+    </div>
+    <p id="enviado" style="margin:12px 0 0"></p>
+  </div>
+</main>
+<script>
+const MB = 1 << 20;
+const $ = id => document.getElementById(id);
+let chave = decodeURIComponent(location.hash.slice(1));
+if (chave) { history.replaceState(null, '', location.pathname); }
+else { try { chave = localStorage.getItem('chave-teste') || ''; } catch (e) {} }
+$('chave').value = chave;
+
+function fase(texto, pct) { $('fase').textContent = texto; $('progresso').style.width = pct + '%'; }
+
+async function bloco(nome, ini, tam) {
+  const t0 = performance.now();
+  const r = await fetch('/iso/' + nome.split('/').map(encodeURIComponent).join('/'), {
+    headers: {'X-Chave': chave, 'Range': `bytes=${ini}-${ini + tam - 1}`}, cache: 'no-store'});
+  if (!r.ok) throw new Error('servidor respondeu ' + r.status);
+  const leitor = r.body.getReader();
+  let ttfb = null, n = 0;
+  for (;;) {
+    const {done, value} = await leitor.read();
+    if (done) break;
+    if (ttfb === null) ttfb = performance.now() - t0;
+    n += value.length;
+  }
+  return {ms: performance.now() - t0, ttfb, n, cf: r.headers.get('cf-ray')};
+}
+
+async function testar() {
+  chave = $('chave').value.trim();
+  if (!chave) return;
+  try { localStorage.setItem('chave-teste', chave); } catch (e) {}
+  $('iniciar').disabled = true;
+  $('cx-andamento').hidden = false;
+  $('cx-resultado').hidden = true;
+  try {
+    fase('Conferindo a chave…', 2);
+    const ri = await fetch('/teste/iso', {headers: {'X-Chave': chave}, cache: 'no-store'});
+    if (ri.status === 403) throw new Error('chave recusada');
+    if (!ri.ok) throw new Error('servidor respondeu ' + ri.status);
+    const iso = await ri.json();
+
+    // 1) blocos novos em pontos aleatórios do ISO (o que o jogo sente ao carregar uma fase)
+    const lat = [], ttfb = [];
+    let cf = '';
+    for (let i = 0; i < 6; i++) {
+      fase(`Saltos no disco ${i + 1}/6…`, 5 + i * 5);
+      const pos = Math.floor(Math.random() * (iso.tam / MB - 2)) * MB;
+      const b = await bloco(iso.nome, pos, MB);
+      lat.push(b.ms); ttfb.push(b.ttfb); cf = b.cf || cf;
+    }
+
+    // 2) leitura contínua com 3 blocos à frente, como a TV box (24 MB)
+    const TOTAL = 24, inicio = Math.floor(Math.random() * (iso.tam / MB - TOTAL - 1)) * MB;
+    let feitos = 0, prox = 0;
+    const t0 = performance.now();
+    async function trabalhador() {
+      while (prox < TOTAL) {
+        const k = prox++;
+        await bloco(iso.nome, inicio + k * MB, MB);
+        feitos++;
+        fase(`Leitura contínua ${feitos}/${TOTAL} MB…`, 35 + feitos / TOTAL * 63);
+      }
+    }
+    await Promise.all([trabalhador(), trabalhador(), trabalhador()]);
+    const vel = TOTAL / ((performance.now() - t0) / 1000);
+
+    const med = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+    const res = {vel_mbs: +vel.toFixed(2), salto_ms: Math.round(med(lat)), ttfb_ms: Math.round(med(ttfb)),
+                 saltos_ms: lat.map(Math.round), rede: (navigator.connection && navigator.connection.effectiveType) || '',
+                 cf_ray: cf, agente: navigator.userAgent.slice(0, 160)};
+    const classe = vel >= 1.5 && res.salto_ms <= 1200 ? 'bom' : vel >= 0.7 ? 'medio' : 'ruim';
+    $('veredito').className = classe;
+    $('veredito').textContent = {bom: '✅ Dá para jogar bem', medio: '⚠️ Joga, mas com carregamentos mais lentos',
+                                 ruim: '❌ Lento demais para a maioria dos jogos'}[classe];
+    $('r-vel').textContent = vel.toFixed(2).replace('.', ',') + ' MB/s';
+    $('r-lat').textContent = res.salto_ms + ' ms';
+    $('r-ttfb').textContent = res.ttfb_ms + ' ms';
+    $('r-rede').textContent = res.rede || 'não informada';
+    $('r-cf').textContent = cf ? cf.split('-').pop() : '—';
+    fase('Pronto', 100);
+    $('cx-resultado').hidden = false;
+    res.veredito = classe;
+    const env = await fetch('/teste/resultado', {method: 'POST', headers: {'X-Chave': chave, 'Content-Type': 'application/json'},
+                                                  body: JSON.stringify(res)});
+    $('enviado').textContent = env.ok ? 'Resultado enviado ao servidor.' : 'Não deu para enviar o resultado.';
+  } catch (e) {
+    fase('Erro: ' + e.message, 0);
+  }
+  $('iniciar').disabled = false;
+  $('iniciar').textContent = 'Testar de novo';
+}
+$('iniciar').addEventListener('click', testar);
+</script>
+</body>
+</html>

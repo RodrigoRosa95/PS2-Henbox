@@ -7,6 +7,9 @@ videos_https.py (/iso/..., rede local em casa ou https://ps2videos.rodrigoflix.c
 enquanto o PS2 joga:
   - blocos de 1 MB guardados na memória (os 48 mais recentes) e uma thread que busca os 3 seguintes;
   - endereços e chave em ~/ps2nav/remoto.json (o mesmo do servidor_host.py).
+Memory card na nuvem (22/10/2026): MC/<arquivo> não vem do pendrive, e sim de ~/ps2nav/mc (nuvem.py), e é o ÚNICO
+lugar onde o PS2 pode gravar (o resto continua só leitura mesmo com --read-only); cada gravação avisa o nuvem.py,
+que manda o cartão ao servidor 15 s depois da última.
 Uso: udpfs_nuvem.py -d /storage/XXXX-XXXX --read-only   (os mesmos argumentos do udpfs_server.py)
 """
 import errno, http.client, json, os, sys, threading, time, urllib.parse
@@ -14,6 +17,8 @@ from collections import OrderedDict
 
 sys.path.insert(0, os.path.expanduser('~/udpfs_server'))
 import udpfs_server as U   # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import nuvem   # noqa: E402
 
 REMOTO = os.path.expanduser('~/ps2nav/remoto.json')
 BLOCO, GUARDA, ADIANTE = 1 << 20, 48, 3
@@ -172,7 +177,49 @@ def _stat_remoto(srv, tam):
             'ctime': agora, 'atime': agora, 'mtime': agora}
 
 
+def _caminho_mc(caminho):
+    """MC/<arquivo> → ~/ps2nav/mc/<arquivo> (None se não for da pasta MC ou sair dela)."""
+    caminho = caminho.replace('\\', '/').lstrip('/')
+    if caminho.split('/', 1)[0].upper() != 'MC':
+        return None
+    resto = caminho.split('/', 1)[1] if '/' in caminho else ''
+    os.makedirs(nuvem.MC_DIR, exist_ok=True)
+    raiz = os.path.realpath(nuvem.MC_DIR)
+    alvo = os.path.realpath(os.path.join(raiz, resto))
+    return alvo if alvo == raiz or alvo.startswith(raiz + os.sep) else None
+
+
 class ServidorNuvem(U.UdpfsServer):
+    mc_handles = set()
+
+    def _resolve_path(self, client_path):
+        mc = _caminho_mc(client_path)
+        return mc if mc else super()._resolve_path(client_path)
+
+    def _escrevendo_mc(self, metodo, addr, payload, handle):
+        """Libera a gravação só para arquivos abertos em MC/ (o laço do udpfs é uma thread só)."""
+        if handle not in self.mc_handles:
+            return metodo(addr, payload)
+        self.read_only = False
+        try:
+            metodo(addr, payload)
+        finally:
+            self.read_only = True
+        nuvem.mc_marcar()
+
+    def _handle_bwrite_req(self, addr, payload):
+        h = U.struct.unpack('<BBHiII', payload[:16])[3] if len(payload) >= 16 else None
+        return self._escrevendo_mc(super()._handle_bwrite_req, addr, payload, h)
+
+    def _handle_write_req(self, addr, payload):
+        h = U.struct.unpack('<BBBBiI', payload[:12])[4] if len(payload) >= 12 else None
+        return self._escrevendo_mc(super()._handle_write_req, addr, payload, h)
+
+    def _handle_close(self, addr, payload):
+        if len(payload) >= 8:
+            self.mc_handles.discard(U.struct.unpack('<BBBBi', payload[:8])[4])
+        return super()._handle_close(addr, payload)
+
     def _caminho_e_remoto(self, payload, inicio):
         caminho = payload[inicio:].split(b'\x00')[0].decode('utf-8', errors='replace')
         local = self._resolve_path(caminho)
@@ -185,6 +232,18 @@ class ServidorNuvem(U.UdpfsServer):
         if len(payload) >= 8:
             _, is_dir, flags, _ = U.struct.unpack('<BBHi', payload[:8])
             caminho, rel = self._caminho_e_remoto(payload, 8)
+            if _caminho_mc(caminho) and not is_dir:   # memory card: abre com gravação liberada
+                antes = set(self.handles)
+                self.read_only = False
+                try:
+                    super()._handle_open(addr, payload)
+                finally:
+                    self.read_only = True
+                novos = set(self.handles) - antes
+                self.mc_handles |= novos
+                if novos:
+                    log('memory card aberto pelo PS2:', caminho)
+                return
             if rel and not is_dir:
                 self.stats['open'] += 1
                 if flags & 0x02:
@@ -223,4 +282,5 @@ class ServidorNuvem(U.UdpfsServer):
 
 if __name__ == '__main__':
     U.UdpfsServer = ServidorNuvem   # o main() oficial monta o servidor com esta classe
+    threading.Thread(target=nuvem.mc_vigiar, daemon=True).start()
     U.main()

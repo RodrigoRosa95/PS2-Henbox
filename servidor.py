@@ -9,6 +9,8 @@ Arquivos estáticos desta pasta (index.html, status.json gravado pelo monitor-ps
   POST /api/sistema  {"acao": "reiniciar"|"desligar"} reset/poweroff do PS2 pelo PS2Link (ps2client)
   GET  /api/estatisticas  tempo jogado por jogo, hoje/semana/total e últimas sessões (estatisticas.json)
   GET/POST /api/ps2/temperatura  temperatura do PS2 lida pelos apps nossos (temperatura.py)
+  GET  /api/chaves   chaves de acesso ao jogo em nuvem (chaves.py, página chaves.html; só da rede local)
+  POST /api/chaves/criar {"nome", "dias"} | /api/chaves/revogar|reativar|apagar {"id"}
 Publica o PS2 no painel do HA (painel_ha.py). Também ouve os comandos de voz da Echo pelo HA ("Alexa, abrir GTA", "Alexa, desligar o PS2"): ver voz.py.
 """
 import json, os, socket, subprocess, threading, time, urllib.request
@@ -142,7 +144,14 @@ class Pagina(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(corpo)
 
+    def local(self):
+        """Só a rede de casa mexe nas chaves (o painel não sai para a internet, mas por garantia)."""
+        ip = self.client_address[0]
+        return ip.startswith(('127.', '192.168.', '10.', '::1', '::ffff:127.', '::ffff:192.168.'))
+
     def do_GET(self):
+        if self.path.startswith('/api/chaves'):
+            return self._json(chaves.listar()) if self.local() else self._json({'erro': 'só da rede de casa'}, 403)
         if self.path.startswith('/api/athena-resultado'):   # teste de rede do AthenaEnv no PS2 (athena-teste/main.js)
             from urllib.parse import urlparse, parse_qs
             q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
@@ -201,6 +210,19 @@ class Pagina(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if self.path.startswith('/api/chaves/'):
+            if not self.local():
+                return self._json({'erro': 'só da rede de casa'}, 403)
+            try:
+                corpo = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0)) or 0) or b'{}')
+            except ValueError:
+                corpo = {}
+            acao = self.path.split('?')[0].split('/')[3]
+            if acao == 'criar':
+                ok, r = chaves.criar(corpo.get('nome'), corpo.get('dias'))
+                return self._json({'ok': ok, 'chave': r} if ok else {'ok': False, 'msg': r})
+            ok, msg = chaves.mudar(str(corpo.get('id', '')), acao)
+            return self._json({'ok': ok, 'msg': msg})
         if self.path.startswith('/api/ps2/temperatura'):   # loja nativa (AthenaEnv) no PS2
             try:
                 corpo = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0)) or 0) or b'{}')
@@ -288,7 +310,7 @@ class Pagina(SimpleHTTPRequestHandler):
         return self._json({'ok': r.returncode == 0, 'msg': (r.stdout or r.stderr).strip()})
 
 
-import cinema, estatisticas, loja, painel_ha, temperatura, voz  # noqa: E402  (usam jogos/jogar/sistema daqui)
+import chaves, cinema, estatisticas, loja, painel_ha, temperatura, voz  # noqa: E402  (usam jogos/jogar/sistema daqui)
 
 _baixando = set()
 

@@ -11,7 +11,7 @@ set -e
 cd "$(dirname "$0")"
 N=..; T=$(mktemp -d)
 mkdir -p "$T/ps2nav/ps2" "$T/ps2nav/fontes" "$T/boot" assets
-cp $N/{navegador_servidor,servidor_host,videos,udpfs_nuvem,configurar}.py "$T/ps2nav/"
+cp $N/{navegador_servidor,servidor_host,videos,udpfs_nuvem,configurar,nuvem}.py "$T/ps2nav/"
 cp $N/tvbox/{iniciar,so-host,so-navegador,so-videos}.sh "$T/ps2nav/"
 cp $N/tvbox/boot-ps2nav.sh "$T/boot/ps2nav"; cp $N/tvbox/udpfs-ps2.sh "$T/boot/udpfs-ps2.sh"
 cp /usr/share/fonts/truetype/dejavu/DejaVuSans{,-Bold}.ttf "$T/ps2nav/fontes/"

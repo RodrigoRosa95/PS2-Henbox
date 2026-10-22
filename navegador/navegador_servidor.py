@@ -24,6 +24,8 @@ from base64 import b64decode
 import websocket
 from PIL import Image, ImageChops, ImageDraw, ImageFont
 
+import nuvem   # memory card na nuvem e atualização do navegador.elf (22/10/2026)
+
 PASTA = os.path.dirname(os.path.abspath(__file__))
 WEB = os.environ.get('PS2_NAV_WEB', '127.0.0.1')   # onde estão o sistema (3004) e o ps2-web (8770); na TV box: o notebook
 INICIO = os.environ.get('PS2_NAV_INICIO', f'http://{WEB}:3004/')
@@ -65,6 +67,7 @@ def _fonte(nome, tam):   # Ubuntu ou a pasta fontes/ ao lado (TV box/Termux)
             return ImageFont.truetype(os.path.join(d, nome), tam)
     return ImageFont.load_default()
 FONTE = _fonte('DejaVuSans-Bold.ttf', 22)
+FONTE_AVISO = _fonte('DejaVuSans-Bold.ttf', 17)
 FONTE_P = _fonte('DejaVuSans.ttf', 15)
 
 B = dict(SELECT=0x0001, START=0x0008, UP=0x0010, RIGHT=0x0020, DOWN=0x0040, LEFT=0x0080, L2=0x0100, R2=0x0200,
@@ -234,6 +237,30 @@ def desenhar_teclado(img, maiusc, sob_cursor):
         d.text(((t[0] + t[2] - w) / 2, (t[1] + t[3]) / 2), rot, font=f, fill=(230, 237, 243), anchor='lm')
 
 
+def desenhar_aviso(img, aviso):
+    """Faixa no alto da tela (22/10/2026): memory card na nuvem e atualização do pendrive. Animação: três pontos que
+    andam (girando) e, se houver, a barra de progresso; a box redesenha ~3 vezes por segundo enquanto houver aviso."""
+    d = ImageDraw.Draw(img)
+    x0, y0, x1, y1 = 60, 14, LARG - 60, 70
+    d.rounded_rectangle((x0 + 3, y0 + 4, x1 + 3, y1 + 4), 12, fill=(0, 0, 0))
+    d.rounded_rectangle((x0, y0, x1, y1), 12, fill=(22, 27, 34), outline=aviso.get('cor', (47, 129, 247)), width=2)
+    if aviso.get('girando'):
+        fase = int(time.time() * 3) % 3
+        for i in range(3):
+            cor = aviso.get('cor', (47, 129, 247)) if i == fase else (72, 79, 88)
+            d.ellipse((x0 + 18 + i * 14, y0 + 22, x0 + 27 + i * 14, y0 + 31), fill=cor)
+        tx = x0 + 70
+    else:
+        tx = x0 + 20
+    d.text((tx, y0 + 27), aviso['texto'], font=FONTE_AVISO, fill=(230, 237, 243), anchor='lm')
+    pct = aviso.get('pct')
+    if pct is not None:
+        d.rounded_rectangle((x0 + 18, y1 - 12, x1 - 18, y1 - 7), 3, fill=(48, 54, 61))
+        if pct > 0:
+            d.rounded_rectangle((x0 + 18, y1 - 12, x0 + 18 + (x1 - x0 - 36) * min(pct, 100) // 100, y1 - 7), 3,
+                                fill=aviso.get('cor', (47, 129, 247)))
+
+
 # ---------------- sessão com o PS2 ----------------
 class Sessao:
     def __init__(self, nav):
@@ -258,6 +285,7 @@ class Sessao:
         self.botoes = 0
         self.cx = self.cy = 0
         self.ult_mov = 0
+        self.aviso = None           # faixa animada no alto (desenhar_aviso)
         nav.ao_quadro = self.novo_quadro
 
     # ---- tela ----
@@ -275,6 +303,8 @@ class Sessao:
             img = self.pagina.copy()
             if self.teclado:
                 desenhar_teclado(img, self.maiusc, self.sob)
+            if self.aviso:
+                desenhar_aviso(img, self.aviso)
             ant = None if tudo else self.enviado
             if ant is not None and ImageChops.difference(img, ant).getbbox() is None:
                 return
@@ -411,6 +441,78 @@ class Sessao:
         self.enfileirar(1, f'{RA_PASTA}/{RA_ELF}', f'mass:/SNES/{nome}', nome, 'abrindo')
         return 'ok'
 
+    # ---- avisos na tela ----
+    def avisar(self, texto, girando=True, pct=None, cor=(47, 129, 247), segundos=None):
+        """Mostra a faixa; com segundos, some sozinha. Uma thread redesenha enquanto ela estiver na tela."""
+        novo = {'texto': texto, 'girando': girando, 'pct': pct, 'cor': cor,
+                'ate': time.time() + segundos if segundos else None}
+        animando = self.aviso is not None
+        self.aviso = novo
+        if not animando:
+            threading.Thread(target=self._animar_aviso, daemon=True).start()
+
+    def _animar_aviso(self):
+        while self.aviso:
+            a = self.aviso
+            if a.get('ate') and time.time() > a['ate']:
+                self.aviso = None
+            elif a.get('pct') is not None and self.pedido and self.pedido.get('arquivo') == '__pendrive__':
+                a['pct'] = self.pedido.get('pct') or a['pct']
+            if self.aberto():
+                self.enviar_tela()
+            time.sleep(0.33)
+        if self.aberto():
+            self.enviar_tela()
+
+    # ---- atualização do navegador.elf do pendrive (22/10/2026) ----
+    def verificar_pendrive(self, tentativa=0):
+        """Ao conectar: (1) a box confere se há navegador.elf novo publicado no servidor (nuvem.py); (2) o PS2 copia o
+        navegador.elf do pendrive para cá; se for diferente do da box, a box grava o dela no pendrive e confere de
+        novo lendo de volta. Vale na próxima vez que abrir pelo OPL (o que está rodando já está na memória)."""
+        try:
+            if nuvem.atualizar_navegador(PASTA_PS2):
+                log('navegador.elf novo baixado do servidor')
+        except Exception as e:
+            log('atualização:', e)
+        if os.path.exists(os.path.join(PASTA_PS2, 'navegador.elf')):
+            self.enfileirar(0, 'mass:/APPS/NAVEGADOR/navegador.elf', 'host:pendrive_atual.elf', '__pendrive__',
+                            'conferindo', depois=lambda est: self._pendrive_lido(est, tentativa))
+
+    def _pendrive_lido(self, est, tentativa):
+        lido = os.path.join(PASTA_PS2, 'pendrive_atual.elf')
+        if est != 2:   # sem pendrive ou sem APPS/NAVEGADOR (aberto de outro jeito): nada a fazer
+            log('pendrive: navegador.elf não encontrado no PS2, sem atualização')
+            return
+        igual = nuvem.sha256_arquivo(lido) == nuvem.sha256_arquivo(os.path.join(PASTA_PS2, 'navegador.elf'))
+        try:
+            os.remove(lido)
+        except OSError:
+            pass
+        if igual:
+            if tentativa:
+                log('pendrive: navegador.elf atualizado e conferido')
+                self.avisar('✔ Navegador atualizado no pendrive', girando=False, cor=(63, 185, 80), segundos=6)
+            else:
+                log('pendrive: navegador.elf em dia')
+            return
+        if tentativa >= 3:
+            log('pendrive: a cópia não conferiu depois de 3 tentativas')
+            self.avisar('✖ Não deu para atualizar o pendrive', girando=False, cor=(248, 81, 73), segundos=8)
+            return
+        log('pendrive: navegador.elf diferente do da box, gravando o novo' + (f' (tentativa {tentativa + 1})' if tentativa else ''))
+        self.avisar('Atualizando o navegador no pendrive…', pct=0)
+        self.enfileirar(0, 'host:navegador.elf', 'mass:/APPS/NAVEGADOR/navegador.elf', '__pendrive__', 'atualizando',
+                        depois=lambda e: self._pendrive_gravado(e, tentativa + 1))
+
+    def _pendrive_gravado(self, est, tentativa):
+        if est != 2:
+            log('pendrive: erro gravando o navegador.elf,', ESTADOS_PEDIDO.get(est, est))
+            self.avisar('✖ Erro gravando no pendrive', girando=False, cor=(248, 81, 73), segundos=8)
+            return
+        self.avisar('Conferindo a cópia no pendrive…')
+        self.enfileirar(0, 'mass:/APPS/NAVEGADOR/navegador.elf', 'host:pendrive_atual.elf', '__pendrive__',
+                        'conferindo', depois=lambda e: self._pendrive_lido(e, tentativa))
+
     def neutrino(self, iso):
         """Jogo de PS2 pela rede (TV box, 17/10/2026): o Neutrino lê o ISO no servidor udpfs da box (udpfs_nuvem.py:
         pendrive da box ou, se não estiver lá, o HD do notebook por HTTPS). O Neutrino abre pelo host: (navlink,
@@ -419,15 +521,34 @@ class Sessao:
         nome = os.path.basename(iso)
         if not self.aberto():
             return 'o navegador não está aberto no PS2'
+        threading.Thread(target=self._abrir_neutrino, args=(nome,), daemon=True).start()
+        return 'ok'
+
+    def _abrir_neutrino(self, nome):
         args = f'-bsd=udpfs|-dvd=udpfs:DVD/{nome}'
+        # Memory card na nuvem (22/10/2026): traz o cartão do servidor para a box antes (nuvem.py) e o Neutrino grava
+        # nele pelo udpfs_nuvem.py; vem antes do pademu porque o pedido tem no máximo 127 bytes
+        try:
+            usar_mc = nuvem.mc_ativo() and len(args) + 23 <= 127
+        except Exception:
+            usar_mc = False
+        if usar_mc:
+            self.avisar('☁ Baixando seu memory card…')
+            try:
+                nuvem.mc_baixar()
+                args += '|-mc0=udpfs:MC/' + nuvem.MC_NOME
+                self.avisar('☁ Memory card pronto — abrindo o jogo', girando=False, cor=(63, 185, 80), segundos=4)
+            except Exception as e:
+                log('memory card:', e)
+                self.avisar('Memory card da nuvem indisponível — usando o do console', girando=False,
+                            cor=(210, 153, 34), segundos=5)
         # DualShock 3/4 por Bluetooth no jogo (18/10/2026): PadEmu do OPL via config/pademu.toml, se existir (apagar o
         # arquivo desliga); o pedido para o PS2 tem no máximo 127 bytes, então ISO de nome longo vai sem ele
         if os.path.exists(os.path.join(PASTA_PS2, 'neutrino', 'config', 'pademu.toml')) and len(args) + 12 <= 127:
             args += '|-cfg=pademu'
         self.enfileirar(1, 'host:neutrino/neutrino.elf', args, '__neutrino__', 'abrindo')
-        return 'ok'
 
-    def enfileirar(self, op, origem, destino, rotulo, fase):
+    def enfileirar(self, op, origem, destino, rotulo, fase, depois=None):
         o, d = origem.encode(), destino.encode()
         if len(o) > 127 or len(d) > 127:
             return
@@ -437,7 +558,8 @@ class Sessao:
         except OSError:
             tam = 0
         self.fila.append({'id': self.pedido_n, 'op': op, 'origem': o, 'destino': d, 'tamanho': tam,
-                          'arquivo': rotulo, 'fase': fase, 'estado': None, 'pct': 0, 't': time.time()})
+                          'arquivo': rotulo, 'fase': fase, 'estado': None, 'pct': 0, 't': time.time(),
+                          'depois': depois})
         if not self.pedido:
             self.proximo_pedido()
 
@@ -479,7 +601,7 @@ class Sessao:
         """Para a loja: o pedido em andamento e o último resultado de cada ROM."""
         atual = None
         if self.pedido:
-            atual = {k: v for k, v in self.pedido.items() if k not in ('origem', 'destino')}
+            atual = {k: v for k, v in self.pedido.items() if k not in ('origem', 'destino', 'depois')}
         return {'atual': atual, 'resultados': self.resultados, 'na_fila': len(self.fila)}
 
     def aberto(self):
@@ -520,6 +642,7 @@ class Sessao:
                     self.proximo_pedido()
                 self.n_teclas = None
                 self.ra_copiado = False   # pode ser outro pendrive
+                threading.Timer(4, self.verificar_pendrive).start()
                 threading.Thread(target=self.enviar_tela, args=(True,), daemon=True).start()
             self.ult_entrada = time.time()
             botoes, cx, cy, rx, ry, seq, n_teclas, roda = struct.unpack('<HHHbbIHb', d[4:19])
@@ -559,6 +682,8 @@ class Sessao:
                                                             or (p['op'] == 1 and not falhou)}
                         if falhou:   # não adianta seguir (ex.: sem pendrive)
                             self.fila = [x for x in self.fila if x['arquivo'] != p['arquivo']]
+                        if p.get('depois'):   # continuação (atualização do pendrive)
+                            threading.Thread(target=p['depois'], args=(est,), daemon=True).start()
                         self.proximo_pedido()
             if len(d) >= 96 and d[91]:   # vídeo tocando: o controle é do player, não da página
                 self.botoes = botoes
@@ -637,47 +762,59 @@ def controle(sessao):
     srv.listen(4)
     while True:
         c, _ = srv.accept()
-        with c:
-            pedido = c.recv(1024).decode('utf-8', errors='ignore').strip()
-            if pedido == 'sair':
-                c.sendall(b'ok\n' if sessao.sair() else b'fechado\n')
-            elif pedido.startswith('copiar '):
-                c.sendall((sessao.copiar(pedido[7:]) + '\n').encode())
-            elif pedido == 'retroarch':
-                c.sendall((sessao.instalar_ra() + '\n').encode())
-            elif pedido.startswith('copiar2 ') or pedido.startswith('apagar '):   # cinema: arquivo ↔ pendrive do PS2
-                partes = pedido.split(' ', 1)[1].split('|')
-                if not sessao.aberto():
-                    c.sendall(b'o navegador nao esta aberto no PS2\n')
-                elif partes[0] == 'copiar2' or pedido.startswith('copiar2'):
-                    origem, destino, rotulo = partes
-                    sessao.enfileirar(0, origem, destino, rotulo, 'copiando')
-                    c.sendall(b'ok\n')
-                else:
-                    destino, rotulo = partes
-                    sessao.enfileirar(3, destino, '', rotulo, 'apagando')
-                    c.sendall(b'ok\n')
-            elif pedido.startswith('video '):
-                c.sendall((sessao.video(pedido[6:].strip()) + '\n').encode())
-            elif pedido.startswith('neutrino '):
-                c.sendall((sessao.neutrino(pedido[9:].strip()) + '\n').encode())
-            elif pedido.startswith('abrir '):   # abrir <ELF>[|args]: o navegador fecha e o PS2 roda o ELF (18/10/2026)
-                elf, _, args = pedido[6:].strip().partition('|')
-                if not sessao.aberto():
-                    c.sendall(b'o navegador nao esta aberto no PS2\n')
-                else:
-                    # args começando com "-": o navegador não confere como arquivo; "-" sozinho = sem argumento útil
-                    sessao.enfileirar(1, elf, args or '-', '__abrir__', 'abrindo')
-                    c.sendall(b'ok\n')
-            elif pedido.startswith('jogar '):
-                c.sendall((sessao.jogar(pedido[6:]) + '\n').encode())
-            elif pedido == 'pedido':
-                c.sendall((json.dumps(sessao.estado_pedidos()) + '\n').encode())
-            elif pedido in ('loja', 'sistema', 'cinema'):   # muda a página (vale também antes de abrir no PS2)
-                sessao.nav.cmd('Page.navigate', esperar=False, url={'loja': LOJA, 'cinema': CINEMA_PAG}.get(pedido, INICIO))
-                c.sendall(b'ok\n')
-            else:
-                c.sendall(b'aberto\n' if sessao.aberto() else b'fechado\n')
+        try:
+            controle_um(sessao, c)
+        except Exception as e:   # um pedido malformado não derruba o controle (22/10/2026)
+            log('controle: pedido com erro:', e)
+            try:
+                c.sendall(f'erro: {e}\n'.encode())
+            except OSError:
+                pass
+        finally:
+            c.close()
+
+
+def controle_um(sessao, c):
+    pedido = c.recv(1024).decode('utf-8', errors='ignore').strip()
+    if pedido == 'sair':
+        c.sendall(b'ok\n' if sessao.sair() else b'fechado\n')
+    elif pedido.startswith('copiar '):
+        c.sendall((sessao.copiar(pedido[7:]) + '\n').encode())
+    elif pedido == 'retroarch':
+        c.sendall((sessao.instalar_ra() + '\n').encode())
+    elif pedido.startswith('copiar2 ') or pedido.startswith('apagar '):   # cinema: arquivo ↔ pendrive do PS2
+        partes = pedido.split(' ', 1)[1].split('|')
+        if not sessao.aberto():
+            c.sendall(b'o navegador nao esta aberto no PS2\n')
+        elif partes[0] == 'copiar2' or pedido.startswith('copiar2'):
+            origem, destino, rotulo = partes
+            sessao.enfileirar(0, origem, destino, rotulo, 'copiando')
+            c.sendall(b'ok\n')
+        else:
+            destino, rotulo = partes
+            sessao.enfileirar(3, destino, '', rotulo, 'apagando')
+            c.sendall(b'ok\n')
+    elif pedido.startswith('video '):
+        c.sendall((sessao.video(pedido[6:].strip()) + '\n').encode())
+    elif pedido.startswith('neutrino '):
+        c.sendall((sessao.neutrino(pedido[9:].strip()) + '\n').encode())
+    elif pedido.startswith('abrir '):   # abrir <ELF>[|args]: o navegador fecha e o PS2 roda o ELF (18/10/2026)
+        elf, _, args = pedido[6:].strip().partition('|')
+        if not sessao.aberto():
+            c.sendall(b'o navegador nao esta aberto no PS2\n')
+        else:
+            # args começando com "-": o navegador não confere como arquivo; "-" sozinho = sem argumento útil
+            sessao.enfileirar(1, elf, args or '-', '__abrir__', 'abrindo')
+            c.sendall(b'ok\n')
+    elif pedido.startswith('jogar '):
+        c.sendall((sessao.jogar(pedido[6:]) + '\n').encode())
+    elif pedido == 'pedido':
+        c.sendall((json.dumps(sessao.estado_pedidos()) + '\n').encode())
+    elif pedido in ('loja', 'sistema', 'cinema'):   # muda a página (vale também antes de abrir no PS2)
+        sessao.nav.cmd('Page.navigate', esperar=False, url={'loja': LOJA, 'cinema': CINEMA_PAG}.get(pedido, INICIO))
+        c.sendall(b'ok\n')
+    else:
+        c.sendall(b'aberto\n' if sessao.aberto() else b'fechado\n')
 
 
 def main():

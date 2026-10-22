@@ -30,3 +30,10 @@ capas/
 *.sfc
 *.m2v
 *.pcm
+# dados do servidor em nuvem (22/10/2026): chaves de acesso, uso, memory cards, testes, versão publicada
+videos_https.chaves.json
+videos_https.uso.json
+navegador/publicado/
+navegador/pendrive.zip
+pendrive_atual.elf
+MC-NUVEM/
