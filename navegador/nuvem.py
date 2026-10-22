@@ -6,7 +6,8 @@ desta box, que guarda o arquivo em ~/ps2nav/mc/ (o pendrive da box é só leitur
   - mc_baixar(): antes de abrir o jogo, traz a versão do servidor se for mais nova (se aqui houver gravação ainda não
     enviada, envia primeiro — a gravação local ganha);
   - mc_marcar(): o udpfs_nuvem.py avisa a cada gravação do PS2; mc_vigiar() envia o cartão 15 s depois da última.
-Cartão novo: 8 MB apagados (0xFF); o próprio jogo formata na primeira vez. "mc_nuvem": false no remoto.json desliga.
+Cartão novo: 8 MB apagados (0xFF); o próprio jogo formata na primeira vez. Só funciona com "mc_nuvem": true no
+remoto.json (desligado por padrão: ainda não foi testado num caminho que abre jogos).
 
 Atualização: atualizar_navegador() compara o ps2/navegador.elf desta box com o publicado no servidor
 (/atualizacao/versao.json) e baixa o novo, conferindo o SHA-256. O navegador_servidor.py depois regrava o do pendrive.
@@ -61,7 +62,7 @@ def pedir(metodo, caminho, corpo=None, cabecalhos=None, timeout=60):
 
 def mc_ativo():
     c = cfg()
-    return bool(c.get('urls') and c.get('chave')) and c.get('mc_nuvem', True) is not False
+    return bool(c.get('urls') and c.get('chave')) and c.get('mc_nuvem') is True   # desligado até ser testado
 
 
 def _meta():
