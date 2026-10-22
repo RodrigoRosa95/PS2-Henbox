@@ -46,6 +46,7 @@
 #include <string.h>
 #include <malloc.h>
 #include <kernel.h>
+#include <timer.h>
 #include <iopcontrol.h>
 #include <iopheap.h>
 #include <sifrpc.h>
@@ -636,6 +637,10 @@ static void executar_como_ps2link(const char *caminho, int n, char **args)
     int k, t = 0, id;
     if (SifLoadElf(caminho, &ed) < 0 || !ed.epc) return;
     gsKit_deinit_global(gs);   /* tira o tratador de vsync do gsKit: o código dele vai ser sobrescrito */
+    /* idem o tratador de interrupção do timer do ps2sdk (DelayThread/alarmes, instalado pelo crt0): com ele ainda
+       ligado, a primeira interrupção depois que o Neutrino se descompacta em 0x100000 pulava para lixo e o EE
+       congelava antes de o Neutrino abrir qualquer arquivo (22/10/2026, qualquer jogo pelo "Jogar pela rede") */
+    _ps2sdk_deinit_timer();
     FlushCache(0);
     FlushCache(2);
     memset(ua, 0, sizeof(*ua));

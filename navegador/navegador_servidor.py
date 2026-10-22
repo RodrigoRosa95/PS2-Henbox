@@ -661,6 +661,14 @@ def controle(sessao):
                 c.sendall((sessao.video(pedido[6:].strip()) + '\n').encode())
             elif pedido.startswith('neutrino '):
                 c.sendall((sessao.neutrino(pedido[9:].strip()) + '\n').encode())
+            elif pedido.startswith('abrir '):   # abrir <ELF>[|args]: o navegador fecha e o PS2 roda o ELF (18/10/2026)
+                elf, _, args = pedido[6:].strip().partition('|')
+                if not sessao.aberto():
+                    c.sendall(b'o navegador nao esta aberto no PS2\n')
+                else:
+                    # args começando com "-": o navegador não confere como arquivo; "-" sozinho = sem argumento útil
+                    sessao.enfileirar(1, elf, args or '-', '__abrir__', 'abrindo')
+                    c.sendall(b'ok\n')
             elif pedido.startswith('jogar '):
                 c.sendall((sessao.jogar(pedido[6:]) + '\n').encode())
             elif pedido == 'pedido':

@@ -6,6 +6,9 @@ EE_OBJS = navegador.o USBD_irx.o DS34BT_irx.o MOUSE_irx.o KBD_irx.o LIBSD_irx.o 
           POWEROFF_irx.o UDPTTY_irx.o IOPTRAP_irx.o
 EE_INCS += -I$(GSKIT)/include -I$(PS2SDK)/ports/include
 EE_LDFLAGS += -L$(GSKIT)/lib -L$(PS2SDK)/ports/lib -Lopl-ds34bt
+# Ligado em 16 MB (22/10/2026), como o PS2Link mora no alto: o Neutrino do "Jogar pela rede" se descompacta em
+# 0x100000 e, com o navegador ali, algum tratador dele ainda registrado no kernel era atropelado (EE congelava, qualquer jogo)
+EE_LINKFILE = linkfile-alto
 EE_LIBS = -lds34bt -lmouse -lkbd -laudsrv -lmpeg -lpacket -ldma -lelf-loader -lgskit -ldmakit -lz -lpad -lpatches
 
 all: $(EE_BIN)
