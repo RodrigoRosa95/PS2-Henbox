@@ -113,7 +113,9 @@ public class Caixa {
                     + " RUN_IN_BACKGROUND allow 2>/dev/null; appops set " + pac + " RUN_ANY_IN_BACKGROUND allow 2>/dev/null");
         }
         su("pm grant com.termux android.permission.POST_NOTIFICATIONS 2>/dev/null; "
-                + "pm grant br.ps2nav android.permission.POST_NOTIFICATIONS 2>/dev/null");
+                + "pm grant br.ps2nav android.permission.POST_NOTIFICATIONS 2>/dev/null; "
+                // o app da box liga o Termux no boot (firmwares que ignoram o Termux:Boot)
+                + "pm grant br.ps2nav com.termux.permission.RUN_COMMAND 2>/dev/null");
     }
 
     void instalar() throws IOException {
@@ -136,7 +138,7 @@ public class Caixa {
         instalarApk("PS2Navegador.apk");
 
         if (!su("ls " + P + "/bin/bash 2>/dev/null").contains("bash")) {
-            log.aviso("Preparando o Termux (1ª vez, precisa de internet na box)…");
+            log.aviso("Preparando o Termux (1ª vez)…");
             sh("am start -n com.termux/.app.TermuxActivity");
             for (int i = 0; i < 90 && !su("ls " + P + "/bin/bash 2>/dev/null").contains("bash"); i++) esperar(2000);
             if (!su("ls " + P + "/bin/bash 2>/dev/null").contains("bash")) throw new IOException("o Termux não terminou de preparar");
@@ -163,19 +165,14 @@ public class Caixa {
                 + H + "/ps2nav/*.sh; chmod 600 " + H + "/ps2nav/config.json; "
                 + "chown -R " + uidTermux + ":" + uidTermux + " " + H + "; rm -rf $N /data/local/tmp/ps2nav.tar.gz");
 
-        if (!suTermux("python3 -c 'import PIL, websocket; print(1)' 2>/dev/null").equals("1")) {
-            log.aviso("Instalando Python e bibliotecas no Termux (pode levar vários minutos)…");
+        if (!pythonPronto()) pythonOffline(abi);
+        if (!pythonPronto()) {
+            log.aviso("Instalando Python e bibliotecas pela internet da box (pode levar vários minutos)…");
             su("rm -f " + H + "/instalar-ps2nav.log");
             rodarNoTermux("instalar-ps2nav.sh", "(yes | pkg update; yes | pkg install python python-pillow; "
                     + "pip install websocket-client) > ~/instalar-ps2nav.log 2>&1; echo FIM >> ~/instalar-ps2nav.log");
-            for (int i = 0; i < 600; i++) {
-                esperar(3000);
-                String fim = su("tail -1 " + H + "/instalar-ps2nav.log 2>/dev/null");
-                if (fim.equals("FIM")) break;
-                if (i % 10 == 0 && fim.length() > 0) log.aviso("… " + (fim.length() > 70 ? fim.substring(0, 70) : fim));
-            }
-            if (!suTermux("python3 -c 'import PIL, websocket; print(1)' 2>/dev/null").equals("1"))
-                throw new IOException("Python não ficou pronto (veja ~/instalar-ps2nav.log na box)");
+            esperarFim("instalar-ps2nav.log", 600);
+            if (!pythonPronto()) throw new IOException("Python não ficou pronto (veja ~/instalar-ps2nav.log na box)");
         }
         String ip = ipAutomatico();
         log.aviso("IP do PS2: " + ip);
@@ -188,6 +185,51 @@ public class Caixa {
         iniciar();
         esperar(15000);
         log.aviso("Pronto! Copie o navegador.elf para o pendrive do PS2 (botão abaixo, com o navegador aberto) ou pelo PC.");
+    }
+
+    boolean pythonPronto() throws IOException {
+        return suTermux("python3 -c 'import PIL, websocket; print(1)' 2>/dev/null").equals("1");
+    }
+
+    void esperarFim(String logBox, int voltas) throws IOException {
+        for (int i = 0; i < voltas; i++) {
+            esperar(3000);
+            String fim = su("tail -1 " + H + "/" + logBox + " 2>/dev/null");
+            if (fim.equals("FIM")) break;
+            if (i % 10 == 0 && fim.length() > 0) log.aviso("… " + (fim.length() > 70 ? fim.substring(0, 70) : fim));
+        }
+    }
+
+    /** Endereço do pacote do Python (os .deb oficiais do Termux + websocket-client), por arquitetura; o celular baixa
+     *  e manda para a box, então a box não precisa de internet nem dos espelhos do Termux (o passo que mais falhava). */
+    static final String PYTHON_URL = "https://raw.githubusercontent.com/RodrigoRosa95/PS2-Henbox/main/downloads/python-";
+
+    void pythonOffline(String abi) {
+        String arq = abi.contains("arm64") ? "aarch64" : abi.contains("x86_64") ? "x86_64" : abi.contains("x86") ? "i686" : "arm";
+        String tmp = "/data/local/tmp/python-" + arq + ".tar";
+        try {
+            log.aviso("Baixando o Python pronto (" + arq + ", ~30 MB)…");
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(PYTHON_URL + arq + ".tar").openConnection();
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(60000);
+            if (c.getResponseCode() != 200) throw new IOException("HTTP " + c.getResponseCode());
+            InputStream i = c.getInputStream();
+            try {
+                adb.enviarArquivo(i, tmp, 0644, null);
+            } finally {
+                i.close();
+            }
+            log.aviso("Instalando o Python sem internet na box…");
+            String d = H + "/python-offline";
+            su("rm -rf " + d + "; mkdir -p " + d + "; cd " + d + " && " + AMB + "tar -xf " + tmp + " -C " + d + "; rm -f " + tmp
+                    + "; chown -R " + uidTermux + ":" + uidTermux + " " + d + "; rm -f " + H + "/instalar-ps2nav.log");
+            rodarNoTermux("instalar-ps2nav.sh", "(cd ~/python-offline && dpkg -i *.deb && pip install --no-index *.whl)"
+                    + " > ~/instalar-ps2nav.log 2>&1; rm -rf ~/python-offline; echo FIM >> ~/instalar-ps2nav.log");
+            esperarFim("instalar-ps2nav.log", 200);
+        } catch (IOException e) {
+            log.aviso("Python pronto indisponível (" + e.getMessage() + "); vou pela internet da box");
+            try { su("rm -f " + tmp); } catch (IOException ignorado) { }
+        }
     }
 
     /** Para os servidores pelo PID (o pkill -f do Termux não alcança os processos e um padrão na mesma linha mataria
@@ -229,6 +271,91 @@ public class Caixa {
     }
 
     String estado() throws IOException { return suTermux("python3 ps2nav/configurar.py estado 2>&1"); }
+
+    /** Lista de conferência (configurar.py checklist): JSON [{ok, item, detalhe, resolver}]. */
+    String checklist() throws IOException { return suTermux("python3 ps2nav/configurar.py checklist 2>&1"); }
+
+    // ---- pendrive do PS2 preparado na USB da própria box (preparar-pendrive.sh, root) ----
+    /** Uma linha por pendrive na box: "ID|tamanho MB|livre MB|sim/não (tem ISO)|pastas". */
+    String[] pendrives() throws IOException {
+        String r = su("sh " + H + "/ps2nav/preparar-pendrive.sh listar 2>&1").trim();
+        return r.length() == 0 ? new String[0] : r.split("\n");
+    }
+
+    String prepararPendrive(String id, boolean formatar) throws IOException {
+        if (!id.matches("[A-Za-z0-9-]+")) throw new IOException("pendrive inválido");
+        if (uidTermux.length() == 0) uidTermux = su("stat -c %u " + T);
+        suTermux("python3 ps2nav/configurar.py aplicar >/dev/null 2>&1; chown -R " + uidTermux + ":" + uidTermux + " "
+                + H + "/ps2nav");   // IPCONFIG.DAT em dia
+        return su("sh " + H + "/ps2nav/preparar-pendrive.sh preparar " + id + (formatar ? " formatar" : "") + " 2>&1");
+    }
+
+    // ---- 🏆 conquistas: xeRAbora oficial (sem licença de redistribuição: o celular baixa do GitHub do autor) ----
+    static final String XERA = "io.github.hacan359.xerabora";
+
+    void instalarXerabora() throws IOException {
+        log.aviso("Procurando a versão mais nova do xeRAbora (github.com/hacan359/xerabora)…");
+        org.json.JSONArray rel;
+        try {
+            rel = new org.json.JSONArray(new String(baixar("https://api.github.com/repos/hacan359/xerabora/releases?per_page=5"), "UTF-8"));
+        } catch (org.json.JSONException e) {
+            throw new IOException("resposta estranha do GitHub");
+        }
+        String apk = null, somas = null, versao = "";
+        for (int k = 0; k < rel.length() && apk == null; k++) {
+            org.json.JSONObject r = rel.optJSONObject(k);
+            org.json.JSONArray as = r.optJSONArray("assets");
+            for (int j = 0; as != null && j < as.length(); j++) {
+                org.json.JSONObject a = as.optJSONObject(j);
+                if (a.optString("name").equals("xerabora-android.apk")) apk = a.optString("browser_download_url");
+                if (a.optString("name").equals("SHA256SUMS")) somas = a.optString("browser_download_url");
+            }
+            versao = r.optString("tag_name");
+            if (apk == null) somas = null;
+        }
+        if (apk == null) throw new IOException("o xeRAbora não tem APK de Android publicado agora");
+        log.aviso("Baixando o xeRAbora " + versao + "…");
+        byte[] dados = baixar(apk);
+        if (somas != null) {
+            String lista = new String(baixar(somas), "UTF-8");
+            String sha = sha256(dados);
+            if (!lista.contains(sha)) throw new IOException("o APK baixado não confere com o SHA256SUMS");
+        }
+        String tmp = "/data/local/tmp/xerabora.apk";
+        adb.enviarArquivo(new ByteArrayInputStream(dados), tmp, 0644, null);
+        String r = sh("pm install -r " + tmp);
+        sh("rm -f " + tmp);
+        if (!r.contains("Success")) throw new IOException("não instalou o xeRAbora: " + r);
+        su("dumpsys deviceidle whitelist +" + XERA + " >/dev/null 2>&1; appops set " + XERA + " RUN_IN_BACKGROUND allow 2>/dev/null");
+        sh("monkey -p " + XERA + " -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1");
+        log.aviso("xeRAbora instalado e aberto na TV. Na TV: entre com o SEU usuário do RetroAchievements e ligue "
+                + "\"OPEN TO THE NETWORK\". Depois disso a box mantém o motor ligado sozinha.");
+    }
+
+    static byte[] baixar(String url) throws IOException {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(60000);
+        c.setRequestProperty("User-Agent", "ps2-henbox");
+        if (c.getResponseCode() != 200) throw new IOException("HTTP " + c.getResponseCode() + " em " + url);
+        InputStream i = c.getInputStream();
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[65536];
+        for (int n; (n = i.read(buf)) > 0; ) b.write(buf, 0, n);
+        i.close();
+        return b.toByteArray();
+    }
+
+    static String sha256(byte[] d) throws IOException {
+        try {
+            byte[] h = java.security.MessageDigest.getInstance("SHA-256").digest(d);
+            StringBuilder sb = new StringBuilder();
+            for (byte x : h) sb.append(String.format("%02x", x & 0xff));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IOException(e.toString());
+        }
+    }
 
     void trocarIp(String ip, String mascara, String gw) throws IOException {
         if (!ip.matches("\\d+\\.\\d+\\.\\d+\\.\\d+") || !mascara.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")

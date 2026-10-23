@@ -32,7 +32,7 @@ O que dá para fazer hoje:
 
 1. Ligue a TV box e espere uns 30 segundos (os servidores sobem sozinhos).
 2. Ligue o PS2 e abra o **OPL**.
-3. Vá em **Apps → Navegador (rede direta)**.
+3. Vá em **Apps → PS2 Henbox**.
 4. Aparece uma barra azul pulsando enquanto o PS2 liga a rede e a TV box se conecta: alguns segundos.
 5. Surge o menu com **🛒 Loja** e **🎬 Vídeos**.
 

@@ -5,7 +5,7 @@
 # A chave fica fora do projeto (~/.config/henbox-conquistas/); sem ela as atualizações não instalam por cima.
 set -e
 cd "$(dirname "$0")"
-SDK=/usr/lib/android-sdk
+SDK=${ANDROID_SDK:-/usr/lib/android-sdk}
 JAR=$SDK/platforms/android-23/android.jar
 BT=$SDK/build-tools/29.0.3
 TVBOX=${TVBOX_PADRAO:-}

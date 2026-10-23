@@ -11,20 +11,20 @@ SAIDA=$(realpath -m "${1:-pendrive.zip}")
 T=$(mktemp -d)
 mkdir -p "$T/APPS/NAVEGADOR" "$T/APPS/NAVEGADOR_INICIAR" "$T/ART"
 cp ps2/navegador.elf "$T/APPS/NAVEGADOR/navegador.elf"
-printf 'title=Navegador (direto)\nboot=navegador.elf\n' > "$T/APPS/NAVEGADOR/title.cfg"
+printf 'title=PS2 Henbox (so loja e videos)\nboot=navegador.elf\n' > "$T/APPS/NAVEGADOR/title.cfg"
 cp ps2/PS2LINK.ELF "$T/APPS/NAVEGADOR_INICIAR/NAVEGADOR_INICIAR.ELF"
-printf 'title=Navegador (iniciar)\nboot=NAVEGADOR_INICIAR.ELF\n' > "$T/APPS/NAVEGADOR_INICIAR/title.cfg"
+printf 'title=PS2 Henbox\nboot=NAVEGADOR_INICIAR.ELF\n' > "$T/APPS/NAVEGADOR_INICIAR/title.cfg"
 printf '192.168.4.230 255.255.255.0 192.168.4.1\n' > "$T/APPS/NAVEGADOR_INICIAR/IPCONFIG.DAT"
 cp capa/navegador.elf_COV.jpg "$T/ART/navegador.elf_COV.jpg"
 cp capa/navegador.elf_COV.jpg "$T/ART/NAVEGADOR_INICIAR.ELF_COV.jpg"
 cat > "$T/APPS/NAVEGADOR/LEIA-ME.txt" <<'TXT'
 PS2 Henbox — Navegador do PS2
-Copie as pastas APPS e ART para a raiz de um pendrive FAT32.
-Para jogar pela rede: OPL → Apps → "Navegador (iniciar)". A TV box encontra o PS2 e abre o navegador sozinha em
-poucos segundos. "Navegador (direto)" abre só a loja e os vídeos (os jogos pela rede não abrem por ele).
-IP do PS2: 192.168.4.230 (máscara 255.255.255.0, gateway 192.168.4.1). Se a sua rede for outra, troque a linha do
-IPCONFIG.DAT nas duas pastas (APPS/NAVEGADOR e APPS/NAVEGADOR_INICIAR) por "IP MÁSCARA GATEWAY" — o app do celular
-mostra a linha certa no fim da instalação.
+Jeito mais fácil: espete este pendrive na USB da TV box e use "Preparar pendrive do PS2" no app PS2 Henbox — a box
+copia tudo com o IP certo. Pelo PC: copie as pastas APPS e ART para a raiz de um pendrive FAT32.
+No PS2: OPL → Apps → "PS2 Henbox". A TV box encontra o PS2 e abre o navegador sozinha em poucos segundos.
+"PS2 Henbox (so loja e videos)" abre o navegador direto (os jogos pela rede não abrem por ele).
+O IP do PS2 fica no IPCONFIG.DAT ("IP MÁSCARA GATEWAY"); a TV box mantém esse arquivo certo sozinha a cada conexão.
+Com o PS2 ligado direto no cabo da TV box, o IP nem precisa ser da rede de casa: a box leva o PS2 para a internet.
 https://github.com/RodrigoRosa95/PS2-Henbox
 TXT
 cat > "$T/APPS/NAVEGADOR_INICIAR/LEIA-ME.txt" <<'TXT'

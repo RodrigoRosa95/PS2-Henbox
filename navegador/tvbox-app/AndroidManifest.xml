@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="br.ps2nav" android:versionCode="1" android:versionName="1.0">
+    package="br.ps2nav" android:versionCode="2" android:versionName="1.1">
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="23" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 23/10/2026: no boot também liga os servidores no Termux (firmwares que ignoram o Termux:Boot) -->
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
     <application android:label="PS2 Navegador" android:usesCleartextTraffic="true">
         <activity android:name=".Inicio" android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">

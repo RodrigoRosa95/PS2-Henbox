@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 public class Principal extends Activity {
     final Handler ui = new Handler(Looper.getMainLooper());
     final ExecutorService fila = Executors.newSingleThreadExecutor();
-    LinearLayout achadas;
+    LinearLayout achadas, pendrives;
     EditText campoBox, campoIp, campoMascara, campoGw, campoServidor, campoChave;
     TextView log, estado;
     Canal adb;
@@ -56,7 +56,7 @@ public class Principal extends Activity {
         rolagem.addView(raiz);
         setContentView(rolagem);
 
-        titulo(raiz, "Instalador PS2 Navegador", 22);
+        titulo(raiz, "PS2 Henbox", 22);
         texto(raiz, "1. Conecte o celular no mesmo Wi-Fi da TV box (com ADB pela rede ligado). 2. Procure ou digite o IP. "
                 + "3. Conecte e aceite \"Permitir depuração\" na TV.");
         botao(raiz, "Instalar NESTA TV box (este aparelho, com root)", new Runnable() { public void run() { conectarAqui(); } });
@@ -70,12 +70,14 @@ public class Principal extends Activity {
 
         titulo(raiz, "TV box", 18);
         botao(raiz, "Instalar / atualizar tudo", new Runnable() { public void run() { tarefa(new Tarefa() {
-            public void rodar() throws Exception { caixa.instalar(); mostrarEstado(); } }); } });
+            public void rodar() throws Exception { caixa.instalar(); mostrarChecklist(); } }); } });
         botao(raiz, "Ver estado", new Runnable() { public void run() { tarefa(new Tarefa() {
             public void rodar() throws Exception { mostrarEstado(); } }); } });
         botao(raiz, "Reiniciar serviços", new Runnable() { public void run() { tarefa(new Tarefa() {
             public void rodar() throws Exception { caixa.uidTermux = caixa.su("stat -c %u " + Caixa.T); caixa.iniciar();
                 escrever("Serviços reiniciando (uns 20 s)…"); caixa.esperar(20000); mostrarEstado(); } }); } });
+        botao(raiz, "🩺 Estado completo (o que falta)", new Runnable() { public void run() { tarefa(new Tarefa() {
+            public void rodar() throws Exception { mostrarChecklist(); } }); } });
         estado = texto(raiz, "Estado: conecte numa TV box.");
         estado.setTypeface(Typeface.MONOSPACE);
 
@@ -92,15 +94,36 @@ public class Principal extends Activity {
                 escrever("Servidor salvo. Reiniciando os serviços…");
                 caixa.iniciar(); caixa.esperar(20000); mostrarEstado(); } }); } });
 
+        titulo(raiz, "Pendrive do PS2", 18);
+        texto(raiz, "Espete o pendrive na USB da TV box (não precisa de PC): a box copia o PS2 Henbox com o IP certo. "
+                + "Depois é só pôr o pendrive na USB da frente do PS2 e abrir OPL → Apps → PS2 Henbox.");
+        botao(raiz, "Preparar pendrive (na USB da TV box)", new Runnable() { public void run() { tarefa(new Tarefa() {
+            public void rodar() throws Exception { listarPendrives(); } }); } });
+        pendrives = new LinearLayout(this);
+        pendrives.setOrientation(LinearLayout.VERTICAL);
+        raiz.addView(pendrives);
+
+        titulo(raiz, "🏆 Conquistas (RetroAchievements)", 18);
+        texto(raiz, "O xeRAbora (app oficial do autor, baixado do GitHub dele) acompanha as conquistas no PS2 real; "
+                + "a TV box prepara as listas sozinha. Você só entra com o seu usuário do RetroAchievements na TV.");
+        botao(raiz, "Instalar conquistas na TV box", new Runnable() { public void run() { tarefa(new Tarefa() {
+            public void rodar() throws Exception { caixa.instalarXerabora(); } }); } });
+        botao(raiz, "Ver conquistas e avisos neste aparelho", new Runnable() { public void run() { abrirConquistas(); } });
+
         titulo(raiz, "PS2", 18);
+        texto(raiz, "Com o PS2 ligado direto no cabo da TV box, nada aqui precisa mudar: a box leva o PS2 para a "
+                + "internet pelo Wi-Fi dela. O IP abaixo só importa com o PS2 no roteador; a box grava o IPCONFIG.DAT "
+                + "no pendrive sozinha quando o navegador abre.");
         campoIp = campo(raiz, "IP do PS2", "192.168.4.230");
         campoMascara = campo(raiz, "Máscara", "255.255.255.0");
         campoGw = campo(raiz, "Gateway", "192.168.4.1");
         botao(raiz, "Salvar IP na TV box", new Runnable() { public void run() { tarefa(new Tarefa() {
             public void rodar() throws Exception {
                 caixa.trocarIp(lido(campoIp), lido(campoMascara), lido(campoGw));
-                escrever("IP salvo. Grave no pendrive do PS2 (abaixo) e reinicie os serviços."); } }); } });
-        texto(raiz, "Com o navegador aberto no PS2 (pelo IP antigo):");
+                escrever("IP salvo. A box grava no pendrive na próxima vez que o navegador abrir (ou prepare o pendrive "
+                        + "de novo na USB da box). Reiniciando os serviços…");
+                caixa.iniciar(); } }); } });
+        texto(raiz, "Com o navegador aberto no PS2, gravar pela rede:");
         botao(raiz, "Gravar IP no pendrive do PS2", new Runnable() { public void run() { tarefa(new Tarefa() {
             public void rodar() throws Exception {
                 escrever("PS2: " + caixa.gravarNoPendrive("IPCONFIG.DAT", "IPCONFIG.DAT")); } }); } });
@@ -136,10 +159,13 @@ public class Principal extends Activity {
     @Override
     protected void onNewIntent(android.content.Intent i) {   // singleTask: am start com o app aberto cai aqui
         super.onNewIntent(i);
+        setIntent(i);
         porIntent(i.getExtras());
     }
 
     void porIntent(Bundle x) {
+        android.net.Uri u = getIntent() != null ? getIntent().getData() : null;
+        if (u != null && "henbox".equals(u.getScheme()) && "parear".equals(u.getHost())) parear(u);
         if (x == null) return;
         if (x.getString("servidor") != null) campoServidor.setText(x.getString("servidor"));
         if (x.getString("chave") != null) campoChave.setText(x.getString("chave"));
@@ -268,13 +294,15 @@ public class Principal extends Activity {
                     }
                 }
                 ex.shutdown();
+                final String henbox = Descobridor.chamar();   // box que já tem o PS2 Henbox responde na hora
+                if (henbox != null) escrever("PS2 Henbox já instalado na TV box " + henbox);
                 try { ex.awaitTermination(60, TimeUnit.SECONDS); } catch (InterruptedException e) { }
                 ui.post(new Runnable() {
                     public void run() {
                         achadas.removeAllViews();
                         if (ips.isEmpty()) { escrever("Nenhuma TV box com ADB pela rede encontrada."); escrever(AJUDA_ADB); }
                         for (final String ip : ips) {
-                            botao(achadas, "TV box em " + ip, new Runnable() { public void run() { campoBox.setText(ip); conectar(); } });
+                            botao(achadas, "TV box em " + ip + (ip.equals(henbox) ? " (PS2 Henbox)" : ""), new Runnable() { public void run() { campoBox.setText(ip); conectar(); } });
                         }
                     }
                 });
@@ -297,6 +325,78 @@ public class Principal extends Activity {
             }
         } catch (Exception e) { }
         return r;
+    }
+
+    /** henbox://parear?url=…&chave=… (QR do servidor/instalar.sh): preenche o servidor e, com uma box conectada, salva. */
+    void parear(android.net.Uri u) {
+        final String url = u.getQueryParameter("url"), chave = u.getQueryParameter("chave");
+        if (url == null || chave == null) return;
+        campoServidor.setText(url);
+        campoChave.setText(chave);
+        escrever("Servidor em nuvem lido do QR: " + url);
+        if (caixa == null) { escrever("Conecte na TV box e toque em Salvar servidor na TV box."); return; }
+        tarefa(new Tarefa() { public void rodar() throws Exception {
+            caixa.configurarServidor(url, chave);
+            escrever("Servidor salvo na TV box. Reiniciando os serviços…");
+            caixa.iniciar(); caixa.esperar(20000); mostrarEstado(); } });
+    }
+
+    void listarPendrives() throws Exception {
+        final String[] linhas = caixa.pendrives();
+        ui.post(new Runnable() { public void run() {
+            pendrives.removeAllViews();
+            if (linhas.length == 0 || !linhas[0].contains("|")) {
+                texto(pendrives, linhas.length > 0 ? linhas[0] : "Nenhum pendrive na USB da TV box. Espete um e toque de novo.");
+                return;
+            }
+            for (String l : linhas) {
+                final String[] c = l.split("\\|", -1);
+                if (c.length < 4) continue;
+                final boolean temIso = c[3].equals("sim");
+                texto(pendrives, "Pendrive " + c[0] + ": " + c[1] + " MB, " + c[2] + " MB livres" + (temIso ? " · tem jogos (ISO)" : "")
+                        + (c.length > 4 && c[4].trim().length() > 0 ? "\nPastas: " + c[4].trim() : ""));
+                botao(pendrives, "Copiar o PS2 Henbox para " + c[0] + " (não apaga nada)", new Runnable() { public void run() {
+                    tarefa(new Tarefa() { public void rodar() throws Exception {
+                        escrever("Pendrive: " + caixa.prepararPendrive(c[0], false)); } }); } });
+                if (!temIso) botao(pendrives, "Formatar " + c[0] + " (APAGA TUDO) e preparar", new Runnable() { public void run() {
+                    new android.app.AlertDialog.Builder(Principal.this).setTitle("Apagar o pendrive " + c[0] + "?")
+                        .setMessage("Tudo o que estiver nele (" + c[1] + " MB) será apagado e ele vira FAT32 com o PS2 Henbox.")
+                        .setNegativeButton("Cancelar", null)
+                        .setPositiveButton("Apagar e preparar", new android.content.DialogInterface.OnClickListener() {
+                            public void onClick(android.content.DialogInterface d, int w) { tarefa(new Tarefa() {
+                                public void rodar() throws Exception {
+                                    escrever("Pendrive: " + caixa.prepararPendrive(c[0], true)); } }); } }).show(); } });
+            }
+        } });
+    }
+
+    void abrirConquistas() {
+        android.content.Intent i = new android.content.Intent(this, Conquistas.class);
+        String ip = boxConectada.matches("\\d+\\.\\d+\\.\\d+\\.\\d+") ? boxConectada : "";
+        if (ip.length() > 0 && Conquistas.tvbox(this).isEmpty())
+            Conquistas.prefs(this).edit().putString("tvbox", ip).apply();
+        startActivity(i);
+    }
+
+    void mostrarChecklist() throws Exception {
+        String bruto = caixa.checklist();
+        final StringBuilder sb = new StringBuilder("TV box " + boxConectada + "\n");
+        try {
+            org.json.JSONArray a = new org.json.JSONArray(bruto.substring(bruto.indexOf('[')));
+            int faltam = 0;
+            for (int k = 0; k < a.length(); k++) {
+                JSONObject i = a.getJSONObject(k);
+                Object ok = i.opt("ok");
+                String sinal = Boolean.TRUE.equals(ok) ? "✅" : Boolean.FALSE.equals(ok) ? "❌" : "➖";
+                if (Boolean.FALSE.equals(ok)) faltam++;
+                sb.append(sinal).append(' ').append(i.optString("item")).append(": ").append(i.optString("detalhe")).append('\n');
+                if (i.optString("resolver").length() > 0) sb.append("   👉 ").append(i.optString("resolver")).append('\n');
+            }
+            sb.append(faltam == 0 ? "\nTudo certo! ➖ = opcional ou PS2 desligado." : "\n" + faltam + " item(ns) a resolver.");
+        } catch (Exception e) {
+            sb.append("Estado indisponível (instale ou atualize primeiro):\n").append(bruto.length() > 300 ? bruto.substring(0, 300) : bruto);
+        }
+        ui.post(new Runnable() { public void run() { estado.setText(sb.toString()); } });
     }
 
     void mostrarEstado() throws Exception {

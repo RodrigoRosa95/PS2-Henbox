@@ -28,7 +28,7 @@ Atualização (22/10/2026): GET /atualizacao/versao.json e /atualizacao/navegado
 import gzip, hashlib, hmac, json, os, re, secrets, shutil, sys, threading, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ARQ_CHAVE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos_https.chave')
+ARQ_CHAVE = os.environ.get('PS2_CHAVE_ARQ') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos_https.chave')   # Docker: /dados
 PORTA = int(sys.argv[1]) if len(sys.argv) > 1 else 8781
 JOGOS = os.environ.get('PS2_JOGOS', '/media/rodrigo/01TERA/PS2')
 SNES = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ps2', 'snes')

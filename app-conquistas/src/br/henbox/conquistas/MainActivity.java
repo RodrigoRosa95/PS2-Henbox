@@ -138,8 +138,15 @@ public class MainActivity extends Activity {
         campo.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         campo.setHint("ex.: 192.168.0.50");
         campo.setText(tvbox(this));
+        final android.widget.CheckBox falar = new android.widget.CheckBox(this);
+        falar.setText("Depois do plim, falar \"Você desbloqueou uma conquista no Play 2\"");
+        falar.setChecked(prefs(this).getBoolean("falar", true));
+        LinearLayout caixa = new LinearLayout(this);
+        caixa.setOrientation(LinearLayout.VERTICAL);
+        caixa.addView(campo);
+        caixa.addView(falar);
         new AlertDialog.Builder(this).setTitle("Endereço da TV box (IP na rede de casa)")
-                .setView(campo)
+                .setView(caixa)
                 .setNeutralButton("🔍 Procurar", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int q) {
                         prefs(MainActivity.this).edit().putString("tvbox", "").apply();
@@ -149,7 +156,8 @@ public class MainActivity extends Activity {
                 .setPositiveButton("Salvar", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int q) {
                         String ip = campo.getText().toString().trim().replaceAll("^https?://", "").replaceAll("[:/].*$", "");
-                        prefs(MainActivity.this).edit().putString("tvbox", ip).putLong("desde", 0).apply();
+                        prefs(MainActivity.this).edit().putString("tvbox", ip).putLong("desde", 0)
+                                .putBoolean("falar", falar.isChecked()).apply();
                         startService(new Intent(MainActivity.this, VigiaService.class));
                         abrir(webViewModerno());
                     }

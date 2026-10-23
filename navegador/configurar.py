@@ -62,8 +62,9 @@ def rede_eth0():
     """(ip, prefixo, gateway) do cabo da box, ou None."""
     try:
         addr = subprocess.run(['ip', '-4', '-o', 'addr', 'show', 'eth0'], capture_output=True, text=True, timeout=5).stdout
-        m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)/(\d+)', addr)
-        if not m:
+        # os /32 com rótulo eth0:henbox são da ponte do henbox-root.sh (PS2 direto no cabo), não de um roteador
+        m = re.search(r'inet (\d+\.\d+\.\d+\.\d+)/(\d+)(?![^\n]*eth0:henbox)', addr)
+        if not m or m.group(2) == '32':
             return None
         rotas = ''
         for tab in ('eth0', 'main'):
@@ -172,6 +173,71 @@ def estado():
     }
 
 
+REDE = '/data/local/henbox-rede'   # estado do henbox-root.sh (PS2 direto no cabo da box)
+
+
+def ler_arq(caminho, padrao=''):
+    try:
+        return open(caminho).read().strip()
+    except OSError:
+        return padrao
+
+
+def checklist():
+    """Lista de conferência da instalação (23/10/2026), para a página /estado e o app do celular:
+    [{"ok": true|false|null, "item": ..., "detalhe": ..., "resolver": ...}] — null = opcional/sem como saber."""
+    e = estado()
+    itens = []
+
+    def add(ok, item, detalhe, resolver=''):
+        itens.append({'ok': ok, 'item': item, 'detalhe': detalhe, 'resolver': '' if ok else resolver})
+
+    parados = [k for k, v in e['servicos'].items() if not v]
+    add(not parados, 'Servidores da TV box', 'todos no ar' if not parados else 'parados: ' + ', '.join(parados),
+        'No app: Reiniciar serviços')
+    add(e['webview'], 'Tela do PS2 (app PS2 Navegador)', 'pronta' if e['webview'] else 'o app da box não respondeu',
+        'No app: Reiniciar serviços (abre o PS2 Navegador na TV)')
+    boot = os.path.exists(os.path.expanduser('~/.termux/boot/ps2nav'))
+    add(boot, 'Liga sozinho com a TV box', 'Termux:Boot + app PS2 Navegador' if boot else 'sem o script de início',
+        'No app: Instalar / atualizar tudo')
+    try:   # o laço root grava a hora a cada volta (o /proc de outro usuário não aparece para o Termux)
+        vivo = time.time() - int(ler_arq(os.path.join(REDE, 'vivo'), '0')) < 30
+    except ValueError:
+        vivo = False
+    modo = ler_arq(os.path.join(REDE, 'estado')).split()
+    if modo:
+        rede = (f'PS2 direto no cabo da box — {"mesma rede do Wi-Fi (ponte)" if modo[0] == "ponte" else "rede própria (NAT)"}'
+                f', internet pelo Wi-Fi da box')
+    else:
+        rede = 'PS2 e TV box no roteador (ou cabo desligado)'
+    add(vivo, 'Rede do PS2', rede if vivo else rede + ' — vigia do cabo parada (precisa de root)',
+        'No app: Reiniciar serviços')
+    ps2 = e['ps2']
+    add(ps2['responde_ping'] or None, 'PS2 na rede', f"IP {ps2['ip']}"
+        + (' respondendo' if ps2['responde_ping'] else ' sem resposta agora (normal com o PS2 desligado)'),
+        'Abra o OPL → Apps → PS2 Henbox')
+    pend = ultima('navegador.log', 'pendrive:') or ''
+    add(None if not pend else 'diferente' not in pend and 'Não deu' not in pend and 'erro' not in pend,
+        'Pendrive do PS2', pend.split('pendrive:', 1)[-1].strip() or 'ainda não conferido (abra o navegador no PS2)',
+        'No app: Preparar pendrive (na USB da TV box)')
+    jogos = os.path.realpath(os.path.join(PASTA, 'ps2', 'jogos-box'))
+    n = len([a for a in os.listdir(jogos) if a.lower().endswith('.iso')]) if os.path.isdir(jogos) else 0
+    add(n > 0 or None, 'Jogos na TV box', f'{n} ISO(s) em {jogos}' if n else 'nenhum pendrive/HD com a pasta DVD na box',
+        'Opcional: pendrive/HD na USB da box com as pastas DVD/ e CD/')
+    tem_srv = bool(ler()['notebook'].get('urls'))
+    add((e['notebook'] != 'fora do alcance') if tem_srv else None, 'Servidor em nuvem',
+        e['notebook'] if tem_srv else 'não configurado (opcional)', 'Confira se o PC do servidor está ligado')
+    udp = ler_arq('/proc/net/udp') + ler_arq('/proc/net/udp6')
+    xera = ':4712 ' in udp
+    add(xera or None, 'Conquistas (xeRAbora)', 'motor no ar' if xera else 'não instalado ou parado (opcional)',
+        'No app: Instalar conquistas')
+    add(e['espaco_livre_mb'] > 300, 'Espaço livre na box', f"{e['espaco_livre_mb']} MB", 'Apague apps ou arquivos da box')
+    atu = ultima('atualizar.log', '') or ''
+    add(None if not atu else 'erro' not in atu.lower(), 'Versão', (e['versao'] or '?') + (' — ' + atu if atu else ''),
+        'Atualize pelo app: Instalar / atualizar tudo')
+    return itens
+
+
 if __name__ == '__main__':
     acao = sys.argv[1] if len(sys.argv) > 1 else 'estado'
     if acao == 'aplicar':
@@ -193,5 +259,7 @@ if __name__ == '__main__':
         gravar(CONFIG, json.dumps(c, ensure_ascii=False, indent=1) + '\n', 0o600)
         aplicar()
         print('ok')
+    elif acao == 'checklist':
+        print(json.dumps(checklist(), ensure_ascii=False))
     else:
         print(json.dumps(estado(), ensure_ascii=False))

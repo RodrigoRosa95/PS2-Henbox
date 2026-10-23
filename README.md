@@ -49,13 +49,17 @@ Detalhes em [Conquistas](docs/conquistas.md).
 No painel do jogo, **☁ Jogar pela rede** abre o Neutrino no PS2 lendo a ISO direto do servidor em nuvem da coleção, aos pedaços,
 atraves da TV box em HTTPS.
 
-## Baixar
+## Instalar (sem PC)
 
-Arquivos prontos (pasta [`downloads/`](downloads/), também na [Release](https://github.com/RodrigoRosa95/PS2-Henbox/releases/latest)):
-[`pendrive.zip`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/pendrive.zip) (pasta `APPS/NAVEGADOR` para o pendrive do PS2) e
-[`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/InstaladorPS2-publico.apk) (no celular ou na própria TV box: instala tudo na
-TV box, com o [Neutrino](https://github.com/rickgaiser/neutrino) 1.8.0 oficial, AFL-3.0). Passo a passo em
-[Instalação](docs/instalacao.md).
+1. Instale o app **PS2 Henbox** ([`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/InstaladorPS2-publico.apk))
+   no celular → **Procurar TV boxes** → **Instalar / atualizar tudo**.
+2. Espete um pendrive na TV box → **Preparar pendrive** → ponha no PS2.
+3. Cabo do PS2 **direto na TV box** (ela leva o PS2 para a internet pelo Wi-Fi) → OPL → Apps → **PS2 Henbox**.
+
+O app mostra um **🩺 estado** com ✅/❌ e o que fazer; a TV box **se atualiza sozinha** por esta pasta
+[`downloads/`](downloads/); conquistas, servidor em nuvem (Linux ou **Docker**, pareado por **QR**) são opcionais.
+Passo a passo em [Instalação](docs/instalacao.md). Também há o
+[`pendrive.zip`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/pendrive.zip) para preparar o pendrive pelo PC.
 
 ## Documentação
 
@@ -73,11 +77,18 @@ TV box, com o [Neutrino](https://github.com/rickgaiser/neutrino) 1.8.0 oficial, 
 | `navegador/*.py` | servidores da TV box (`navegador_servidor`, `servidor_host`, `videos`, `udpfs_nuvem`, `configurar`) e do notebook (`videos_https`) |
 | `navegador/tvbox/` | scripts de inicialização na TV box (Termux / Termux:Boot) |
 | `navegador/tvbox-app/` | app Android da TV box: WebView numa tela virtual 640x448 + ponte DevTools |
-| `navegador/instalador/` | app Android do celular: acha a TV box por ADB, instala tudo e mostra o estado |
+| `navegador/instalador/` | app **PS2 Henbox** (celular ou TV box): instala tudo por ADB, Python pronto sem internet na box, estado ✅/❌, pendrive do PS2 pela USB da box, conquistas e pareamento por QR |
+| `navegador/tvbox/henbox-root.sh` | root na box: PS2 direto no cabo (ponte proxy ARP ou NAT, automático) e motor das conquistas sempre ligado |
+| `navegador/atualizar.py` | atualização automática da box pela pasta `downloads/` |
+| `conquistas/opl-ra/` | OPL-RA do Henbox (fork AFL-3.0 do OPL do xeRAbora): patches e compilação; pronto em `downloads/OPL-RA-Henbox.ELF` |
+| `servidor/` | servidor em nuvem: `instalar.sh` (Linux), `Dockerfile`/`docker-compose.yml`, `parear.py` (QR) |
 | `lancador/` | `abrir.elf`: abre um ELF do memory card a partir do PS2Link |
 | raiz | loja e cinema do notebook (`servidor.py`, `loja.html`, `cinema.py`…) |
 
 ## Compilar
+
+O [GitHub Actions](.github/workflows/compilar.yml) compila o `navegador.elf` (imagem `ps2dev/ps2dev`) e os apps a cada
+envio. À mão:
 
 - PS2 (ps2sdk + gsKit em `/usr/local/ps2dev`): `make -C navegador/navlink && make -C navegador/ps2`
 - App da TV box: `navegador/tvbox-app/montar.sh` (aapt, dx, android-23, apksigner — sem Gradle)

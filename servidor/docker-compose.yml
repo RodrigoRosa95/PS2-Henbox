@@ -1,0 +1,21 @@
+# Servidor em nuvem do PS2 Henbox (23/10/2026). Na raiz do repositório:
+#   COLECAO=/caminho/da/colecao docker compose -f servidor/docker-compose.yml up -d
+#   docker compose -f servidor/docker-compose.yml logs servidor | grep -A40 PAREAR    → QR para o app do celular
+# A coleção é uma pasta com DVD/ e CD/ (ISOs de PS2). No Windows: COLECAO=D:\PS2
+services:
+  servidor:
+    build:
+      context: ..
+      dockerfile: servidor/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8770:8770"
+      - "8781:8781"
+    volumes:
+      - ${COLECAO:?defina COLECAO=/pasta/da/colecao}:/colecao
+      - henbox-dados:/dados
+    environment:
+      # endereço que o QR leva (o IP deste PC na rede de casa); vazio = o parear.py tenta descobrir
+      - PS2_ENDERECO=${PS2_ENDERECO:-}
+volumes:
+  henbox-dados:

@@ -30,6 +30,10 @@ public class VigiaService extends Service {
     static final String CANAL = "conquistas";
     static final int ID_FIXA = 1;
     volatile boolean rodando;
+    // depois do plim, "Você desbloqueou uma conquista no Play 2." pela voz do Android — opcional, ⚙ (23/10/2026)
+    static final String FRASE = "Você desbloqueou uma conquista no Play 2.";
+    android.speech.tts.TextToSpeech voz;
+    boolean vozPronta;
 
     static Uri som(Context c) {
         int id = c.getResources().getIdentifier("trofeu", "raw", c.getPackageName());   // sem R.java neste build
@@ -124,6 +128,39 @@ public class VigiaService extends Service {
                 .setPriority(Notification.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(abrir);
         if (medalha != null) n.setLargeIcon(medalha);
         ((NotificationManager) getSystemService(NOTIFICATION_SERVICE)).notify(d.optInt("id", (int) System.currentTimeMillis()), n.build());
+        if (MainActivity.prefs(this).getBoolean("falar", true)) falarDepoisDoPlim();
+    }
+
+    void falarDepoisDoPlim() {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+            public void run() {
+                if (voz == null) {   // 1ª vez: liga a voz e fala quando ficar pronta
+                    voz = new android.speech.tts.TextToSpeech(VigiaClasse(), new android.speech.tts.TextToSpeech.OnInitListener() {
+                        public void onInit(int st) {
+                            vozPronta = st == android.speech.tts.TextToSpeech.SUCCESS;
+                            if (vozPronta) { voz.setLanguage(new java.util.Locale("pt", "BR")); dizer(); }
+                        }
+                    }, motorDeVoz());
+                } else if (vozPronta) dizer();
+            }
+        }, 1500);   // o plim dura ~1 s
+    }
+
+    @SuppressWarnings("deprecation")
+    void dizer() {
+        voz.speak(FRASE, android.speech.tts.TextToSpeech.QUEUE_ADD, null);
+    }
+
+    android.content.Context VigiaClasse() { return this; }
+
+    /** Voz do Google se existir (tem português do Brasil; o Pico de aparelhos antigos não tem), senão a padrão. */
+    String motorDeVoz() {
+        try {
+            getPackageManager().getPackageInfo("com.google.android.tts", 0);
+            return "com.google.android.tts";
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     static byte[] bytes(String url) throws Exception {
@@ -146,6 +183,7 @@ public class VigiaService extends Service {
     @Override
     public void onDestroy() {
         rodando = false;
+        if (voz != null) voz.shutdown();
         super.onDestroy();
     }
 

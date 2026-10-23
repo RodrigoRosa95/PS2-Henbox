@@ -72,7 +72,7 @@ O notebook guarda o conteúdo (jogos, ROMs, vídeos, catálogo) e o entrega só 
 
 **Abrir o navegador (OPL)**
 
-1. OPL → Apps → "Navegador (rede direta)" abre `mass:/APPS/NAVEGADOR/navegador.elf`.
+1. OPL → Apps → "PS2 Henbox" abre o PS2Link (`mass:/APPS/NAVEGADOR_INICIAR/`), que a TV box usa para abrir o `navegador.elf`; "PS2 Henbox (so loja e videos)" abre `mass:/APPS/NAVEGADOR/navegador.elf` direto.
 2. O navegador lê `IPCONFIG.DAT`, reinicia o IOP com a pilha de rede e o `navlink.irx`, e mostra a barra azul pulsando.
 3. O `servidor_host.py` da box conecta na porta 0x4721 do PS2 (se o IP não responder, procura nas redes locais).
 4. O PS2 consegue abrir `host:clique.raw`, liga som, controle e a thread de rede; a box já tem a página inicial pronta e manda a tela inteira.

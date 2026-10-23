@@ -1,0 +1,10 @@
+# imagem do servidor (servidor/Dockerfile): só o código
+.git
+downloads
+docs
+**/*.apk
+**/*.tar
+**/*.tar.gz
+app-conquistas
+navegador/instalador
+navegador/tvbox-app

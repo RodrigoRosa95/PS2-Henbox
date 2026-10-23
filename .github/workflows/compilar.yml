@@ -1,0 +1,60 @@
+# Compila tudo a cada envio (23/10/2026): navegador.elf (imagem oficial ps2dev), apps Android sem Gradle e confere
+# a sintaxe dos servidores Python e dos scripts da TV box. Os arquivos saem em "Artifacts" na página da execução.
+# Os APKs daqui são assinados com uma chave descartável (só para provar que compila); os de downloads/ são os oficiais.
+name: Compilar
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ps2:
+    runs-on: ubuntu-latest
+    container: ps2dev/ps2dev:latest
+    steps:
+      - run: apk add --no-cache make bash git
+      - uses: actions/checkout@v4
+      - name: navlink.irx + navegador.elf
+        run: make -C navegador/navlink && make -C navegador/ps2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: navegador-elf
+          path: navegador/ps2/navegador.elf
+
+  android:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_SDK: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: SDK (plataforma 23 + build-tools 29.0.3, que ainda tem o dx)
+        run: yes | "$ANDROID_SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-23" "build-tools;29.0.3" > /dev/null
+      - name: App da TV box (PS2 Navegador)
+        run: navegador/tvbox-app/montar.sh
+      - name: App PS2 Conquistas
+        run: app-conquistas/montar.sh
+      - name: App PS2 Henbox (instalador) — só compila; o pacote da box precisa do Neutrino, fora do repositório
+        run: |
+          cd navegador/instalador
+          J=$ANDROID_SDK/platforms/android-23/android.jar
+          mkdir -p /tmp/obj && javac --release 8 -nowarn -cp "$J" -d /tmp/obj $(find src -name '*.java')
+          "$ANDROID_SDK/build-tools/29.0.3/aapt" package -f -M AndroidManifest.xml -S res -I "$J" -F /tmp/res.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: |
+            navegador/tvbox-app/PS2Navegador.apk
+            app-conquistas/PS2Conquistas.apk
+
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python
+        run: python3 -m py_compile $(git ls-files '*.py')
+      - name: Shell
+        run: for f in $(git ls-files '*.sh'); do bash -n "$f" || exit 1; done

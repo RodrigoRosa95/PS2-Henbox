@@ -502,11 +502,12 @@ class Sessao:
         except (OSError, ValueError):
             ate = time.time()   # 1ª vez: não repete o histórico antigo
         novos = [d for d in hist if (d.get('quando') or 0) > ate]
-        if hist:
-            gravar(os.path.join(pasta, 'resumo-navegador.json'),
-                   json.dumps({'ate': max(d.get('quando') or 0 for d in hist)}).encode())
+        if not os.path.exists(os.path.join(pasta, 'resumo-navegador.json')) and hist:   # 1ª vez: marca o ponto de partida
+            gravar(os.path.join(pasta, 'resumo-navegador.json'), json.dumps({'ate': ate}).encode())
         if not novos or not self.aberto():
-            return
+            return   # (23/10) só marca como mostradas quando aparecem de verdade no PS2: nada se perde
+        gravar(os.path.join(pasta, 'resumo-navegador.json'),
+               json.dumps({'ate': max(d.get('quando') or 0 for d in hist)}).encode())
         nomes = ', '.join(d.get('titulo') or '?' for d in novos[-3:]) + ('…' if len(novos) > 3 else '')
         self.falar('trofeu-resumo', f'🏆 {len(novos)} conquista{"s" if len(novos) > 1 else ""}: {nomes}')
 
@@ -532,6 +533,29 @@ class Sessao:
                     feito[nome] = md5
                     gravar(estado_arq, json.dumps(feito).encode())
             self.enfileirar(0, f'host:ra/{nome}', f'mass:/RA/{nome}', 'ra-wl:' + nome, 'copiando', depois=marcar)
+
+    # ---- IP do PS2 no pendrive (23/10/2026): o IPCONFIG.DAT segue o config.json da box sozinho ----
+    def sincronizar_ip(self):
+        """Ao conectar: lê o IPCONFIG.DAT das duas pastas do pendrive (o PS2Link do "Navegador (iniciar)" e o navegador
+        direto) e grava o da box (ps2/IPCONFIG.DAT, do configurar.py) onde estiver diferente ou faltando. Quem troca o
+        IP no app do celular não precisa mais mexer no pendrive; vale na próxima vez que abrir pelo OPL."""
+        certo = os.path.join(PASTA_PS2, 'IPCONFIG.DAT')
+        if not os.path.exists(certo):
+            return
+        for pasta in ('NAVEGADOR_INICIAR', 'NAVEGADOR'):
+            def lido(est, pasta=pasta):
+                arq = os.path.join(PASTA_PS2, 'ipconfig_lido.dat')
+                try:
+                    atual = open(arq, 'rb').read().split() if est == 2 else None
+                    os.remove(arq)
+                except OSError:
+                    atual = None
+                if atual == open(certo, 'rb').read().split():
+                    return
+                log(f'pendrive: IPCONFIG.DAT de {pasta} {"diferente" if atual else "faltando"}, gravando o da box')
+                self.enfileirar(0, 'host:IPCONFIG.DAT', f'mass:/APPS/{pasta}/IPCONFIG.DAT', '__ip__' + pasta, 'gravando IP')
+            self.enfileirar(0, f'mass:/APPS/{pasta}/IPCONFIG.DAT', 'host:ipconfig_lido.dat', '__ipler__' + pasta, 'conferindo',
+                            depois=lido)
 
     # ---- atualização do navegador.elf do pendrive (22/10/2026) ----
     def verificar_pendrive(self, tentativa=0):
@@ -712,6 +736,7 @@ class Sessao:
                 self.n_teclas = None
                 self.ra_copiado = False   # pode ser outro pendrive
                 threading.Timer(4, self.verificar_pendrive).start()
+                threading.Timer(7, self.sincronizar_ip).start()   # IP do config.json → IPCONFIG.DAT do pendrive
                 threading.Timer(10, self.sincronizar_ra).start()   # 🏆 listas de conquistas novas → pendrive do PS2
                 threading.Timer(12, self.resumo_desbloqueios).start()   # 🏆 o que foi desbloqueado no jogo
                 threading.Thread(target=self.enviar_tela, args=(True,), daemon=True).start()

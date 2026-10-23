@@ -1,19 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- PS2 Henbox (23/10/2026): o instalador virou o app único — instalar, estado, pendrive do PS2 e conquistas.
+     O pacote continua br.ps2nav.instalador para atualizar por cima do "Instalador PS2". -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="br.ps2nav.instalador" android:versionCode="2" android:versionName="1.1">
+    package="br.ps2nav.instalador" android:versionCode="3" android:versionName="2.0">
     <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="23" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- também roda na própria TV box (18/10/2026): aparece no launcher da TV e não exige tela de toque -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
-    <application android:label="Instalador PS2" android:theme="@android:style/Theme.DeviceDefault">
+    <application android:label="PS2 Henbox" android:icon="@drawable/icone" android:banner="@drawable/icone"
+        android:usesCleartextTraffic="true" android:theme="@android:style/Theme.DeviceDefault">
         <activity android:name=".Principal" android:exported="true" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize|stateHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <!-- pareamento com o servidor em nuvem: QR do servidor/instalar.sh → henbox://parear?url=…&chave=… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="henbox" android:host="parear" />
+            </intent-filter>
         </activity>
+        <activity android:name=".Conquistas" android:launchMode="singleTask" android:label="Conquistas do PS2"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <service android:name=".VigiaConquistas" android:exported="false" />
+        <receiver android:name=".AoLigarConquistas" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

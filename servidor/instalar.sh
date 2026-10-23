@@ -55,8 +55,8 @@ UNIT
 fi
 
 IP=$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[\d.]+' || hostname -I | awk '{print $1}')
+python3 -c 'import qrcode' 2>/dev/null || pip install --user qrcode >/dev/null 2>&1 || true
 echo
-echo "Pronto. No app do celular (InstaladorPS2), em Servidor em nuvem:"
-echo "  Endereço: http://$IP:8781"
-echo "  Chave:    $(cat "$CHAVE")"
-echo "Coleção: $COLECAO (ponha os ISOs em DVD/ e CD/)."
+echo "Pronto. Coleção: $COLECAO (ponha os ISOs em DVD/ e CD/)."
+python3 "$RAIZ/servidor/parear.py" "http://$IP:8781"
+echo "Para mostrar o QR de novo: servidor/parear.py"

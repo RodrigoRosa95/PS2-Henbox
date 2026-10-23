@@ -7,15 +7,25 @@
 # ROMs e vídeos ficam de fora (a loja baixa a ROM do notebook quando precisa).
 # PUBLICO=1 (18/10/2026, Release do GitHub): sem chave e sem endereços (o app pergunta o servidor), sem SMS e SNESticle
 # (licenças sem redistribuição clara) e com o aviso de licença do Neutrino (AFL-3.0).
+# CONVIDADO=<json do painel de chaves> (22/10/2026): igual ao público, mas já com o HTTPS e a chave extra do convidado
+# (revogável no painel) — sem os endereços de casa. Baixado em /instalador?chave=… do videos_https.py.
+[ -n "$CONVIDADO" ] && PUBLICO=1
 set -e
 cd "$(dirname "$0")"
 N=..; T=$(mktemp -d)
 mkdir -p "$T/ps2nav/ps2" "$T/ps2nav/fontes" "$T/boot" assets
-cp $N/{navegador_servidor,servidor_host,videos,udpfs_nuvem,configurar,nuvem}.py "$T/ps2nav/"
-cp $N/tvbox/{iniciar,so-host,so-navegador,so-videos}.sh "$T/ps2nav/"
+cp $N/{navegador_servidor,servidor_host,videos,udpfs_nuvem,configurar,nuvem,atualizar,ra_hash,ra_preparar}.py "$T/ps2nav/"
+cp $N/tvbox/{iniciar,so-host,so-navegador,so-videos,henbox-root,preparar-pendrive}.sh "$T/ps2nav/"
 cp $N/tvbox/boot-ps2nav.sh "$T/boot/ps2nav"; cp $N/tvbox/udpfs-ps2.sh "$T/boot/udpfs-ps2.sh"
 cp /usr/share/fonts/truetype/dejavu/DejaVuSans{,-Bold}.ttf "$T/ps2nav/fontes/"
 cp $N/ps2/{clique.raw,musica.raw,navegador.elf} "$T/ps2nav/ps2/"
+# 🏆 conquistas: OPL-RA do Henbox (fork AFL-3.0 do OPL do xeRAbora; patches em conquistas/opl-ra/ no GitHub) e os sons
+mkdir -p "$T/ps2nav/ps2/oplra" "$T/ps2nav/ps2/sons"
+cp ../../opl-ra/OPL-RA-SMB.ELF "$T/ps2nav/ps2/oplra/"
+cp $N/sons/*.raw "$T/ps2nav/ps2/sons/"
+# pendrive do PS2 pronto (APPS + ART), para o "Preparar pendrive" na USB da própria box
+$N/gerar-pendrive.sh "$T/pendrive.zip" > /dev/null
+mkdir -p "$T/ps2nav/pendrive" && (cd "$T/ps2nav/pendrive" && unzip -q ../../pendrive.zip) && rm "$T/pendrive.zip"
 if [ "$PUBLICO" = 1 ]; then cp -r $N/ps2/opl "$T/ps2nav/ps2/"; else cp -r $N/ps2/opl $N/ps2/sms $N/ps2/snesticle "$T/ps2nav/ps2/"; fi
 cp -r ../../neutrino "$T/ps2nav/ps2/neutrino"
 cat > "$T/ps2nav/ps2/neutrino/LEIA-ME.txt" <<'AVISO'
@@ -28,19 +38,31 @@ AVISO
 mkdir -p "$T/udpfs_server"; cp -r ../../udpfs_server/udpfs_server.py ../../udpfs_server/compressed_iso "$T/udpfs_server/"
 find "$T" -name __pycache__ -prune -exec rm -rf {} +
 find "$T" \( -name "*.bak*" -o -name "*.antes-*" \) -delete
-python3 - "$T/ps2nav/config.json" "$PUBLICO" <<'PY'
+python3 - "$T/ps2nav/config.json" "$PUBLICO" "$CONVIDADO" <<'PY'
 import json, sys
+if sys.argv[3]:
+    c = json.load(open(sys.argv[3]))['chave']
+    json.dump({'ps2': {'ip': '192.168.4.230', 'mascara': '255.255.255.0', 'gw': '192.168.4.1'},
+               'notebook': {'urls': ['https://ps2videos.rodrigoflix.com'], 'chave': c['chave'] if isinstance(c, dict) else c,
+                            'casa': ''}}, open(sys.argv[1], 'w'), indent=1)
+    sys.exit()
 if sys.argv[2] == '1':
     json.dump({'ps2': {'ip': '192.168.4.230', 'mascara': '255.255.255.0', 'gw': '192.168.4.1'},
                'notebook': {'urls': [], 'chave': '', 'casa': ''}}, open(sys.argv[1], 'w'), indent=1)
     sys.exit()
 chave = open('../videos_https.chave').read().strip()
-json.dump({'ps2': {'ip': '192.168.4.230', 'mascara': '255.255.255.0', 'gw': '192.168.4.1'},
+json.dump({'ps2': {'ip': '192.168.4.230', 'mascara': '255.255.255.0', 'gw': '192.168.4.1'}, 'atualizar': False,
            'notebook': {'urls': ['http://192.168.4.135:8781', 'https://ps2videos.rodrigoflix.com'], 'chave': chave,
                         'casa': 'http://192.168.4.135:8770'}}, open(sys.argv[1], 'w'), indent=1)
 PY
 date +%Y%m%d-%H%M > "$T/ps2nav/VERSAO"
 tar -czf assets/ps2nav.tar.gz -C "$T" ps2nav udpfs_server boot
+# público: também o pacote da atualização automática (atualizar.py), sem config.json, para a pasta downloads/ do GitHub
+if [ "$PUBLICO" = 1 ] && [ -z "$CONVIDADO" ]; then
+    rm "$T/ps2nav/config.json"
+    tar -czf sai-ps2nav-atualizacao.tar.gz -C "$T" ps2nav udpfs_server boot
+    echo "$(cat "$T/ps2nav/VERSAO") $(sha256sum sai-ps2nav-atualizacao.tar.gz | cut -d' ' -f1)" > sai-ps2nav-versao.txt
+fi
 cp ../tvbox-app/PS2Navegador.apk assets/
 cp terceiros/termux-app_v0.118.3+github-debug_armeabi-v7a.apk assets/termux-armeabi-v7a.apk
 cp terceiros/termux-app_v0.118.3+github-debug_arm64-v8a.apk assets/termux-arm64-v8a.apk

@@ -518,7 +518,19 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(d)
         elif u.path == '/henbox':   # identificação para o app do celular achar esta TV box sozinho na rede
-            return self.json({'app': 'ps2-henbox', 'conquistas': True})
+            return self.json({'app': 'ps2-henbox', 'conquistas': True, 'estado': True})
+        elif u.path in ('/estado', '/estado.json'):   # lista de conferência da instalação (configurar.checklist)
+            import configurar
+            itens = configurar.checklist()
+            if u.path.endswith('.json'):
+                return self.json(itens)
+            sinal = {True: '✅', False: '❌', None: '➖'}
+            linhas = ''.join(f'<div class="b"><b>{sinal[i["ok"]]} {html.escape(i["item"])}</b>'
+                             f'<div class="p">{html.escape(i["detalhe"])}</div>'
+                             + (f'<div class="p">👉 {html.escape(i["resolver"])}</div>' if i['resolver'] else '') + '</div>'
+                             for i in itens)
+            self.pagina('<meta http-equiv="refresh" content="20"><h1>🩺 Estado do PS2 Henbox</h1><div class="lista">'
+                        + linhas + '<a class="b" href="/">← Voltar</a></div>')
         elif u.path == '/conquistas/api/desbloqueios':   # ?desde=<epoch>: o assistente do Xoom faz o pop-up
             try:
                 desde = float((q.get('desde') or ['0'])[0])
@@ -548,9 +560,28 @@ class H(BaseHTTPRequestHandler):
             self.send_error(404)
 
 
+PORTA_ACHAR = 8779   # UDP: "HENBOX?" → {"app": "ps2-henbox", "porta": 8780}; os apps acham a box na hora (broadcast)
+
+
+def responder_busca():
+    import socket
+    so = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    so.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    so.bind(('0.0.0.0', PORTA_ACHAR))
+    resposta = json.dumps({'app': 'ps2-henbox', 'porta': PORTA}).encode()
+    while True:
+        try:
+            dados, quem = so.recvfrom(64)
+            if dados.startswith(b'HENBOX?'):
+                so.sendto(resposta, quem)
+        except OSError:
+            time.sleep(1)
+
+
 if __name__ == '__main__':
     print(f'vídeos do PS2 em http://0.0.0.0:{PORTA}/ ({VIDEOS})', flush=True)
     import threading
+    threading.Thread(target=responder_busca, daemon=True).start()
     threading.Thread(target=laco_conquistas, daemon=True).start()   # 🏆 prepara sozinho os ISOs novos
     threading.Thread(target=vigiar_desbloqueios, daemon=True).start()   # 🏆 histórico de desbloqueios
     ThreadingHTTPServer(('0.0.0.0', PORTA), H).serve_forever()
