@@ -5,8 +5,8 @@ só precisa da pasta `APPS/NAVEGADOR`**; todo o resto (Neutrino, loja, servidore
 
 ## Caminho rápido
 
-1. **Pendrive do PS2:** baixe o [`pendrive.zip`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/raw/main/downloads/pendrive.zip) e descompacte na raiz de um pendrive FAT32.
-2. **Instalador:** instale o [`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/raw/main/downloads/InstaladorPS2-publico.apk).
+1. **Pendrive do PS2:** baixe o [`pendrive.zip`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/pendrive.zip) e descompacte na raiz de um pendrive FAT32.
+2. **Instalador:** instale o [`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/InstaladorPS2-publico.apk).
 3. **TV box**, de um destes jeitos:
    - **Direto na TV box:** instale o mesmo APK na própria box (pendrive + gerenciador de arquivos, ou
      `adb install`). Abra **Instalador PS2** no launcher da TV → **Instalar NESTA TV box** (aceite o pedido de root)
@@ -79,7 +79,7 @@ boot=navegador.elf
 Sem o `IPCONFIG.DAT`, o PS2 usa `192.168.4.230 / 255.255.255.0 / 192.168.4.1`. Escolha um IP livre na rede da TV box.
 O PS2 não pega IP por DHCP.
 
-O [`pendrive.zip`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/raw/main/downloads/pendrive.zip) já traz a pasta `APPS/NAVEGADOR` pronta. O app do celular também grava o `navegador.elf` e o `IPCONFIG.DAT` no pendrive com os botões **Gravar navegador.elf no
+O [`pendrive.zip`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/pendrive.zip) já traz a pasta `APPS/NAVEGADOR` pronta. O app do celular também grava o `navegador.elf` e o `IPCONFIG.DAT` no pendrive com os botões **Gravar navegador.elf no
 pendrive do PS2** e **Gravar IP no pendrive do PS2** (com o navegador já aberto no PS2). Na primeira vez, copie pelo PC.
 
 A loja cria sozinha, quando você usa o Super Nintendo:

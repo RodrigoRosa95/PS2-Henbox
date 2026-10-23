@@ -1,15 +1,27 @@
-# ps2GamesCLoudinOPl — PS2 Navegador
+# PS2 Henbox — o "HEN" do PlayStation 2
 
-O projeto ps2GamesCLoudinOPl é uma solução criativa que transforma o seu PlayStation 2 em um console capaz de acessar uma loja de jogos online e até mesmo executar jogos diretamente da nuvem, sem a necessidade de baixá-los completamente para um pendrive ou HD.
+No PS3, o **HEN** (Homebrew Enabler) é um desbloqueio que não troca peça nenhuma do console: você ativa e o PS3 passa a
+rodar homebrew, lojas e backups. O **PS2 Henbox** busca chegar o mais perto possível disso no PlayStation 2, sem
+modchip, usando duas peças baratas:
 
-🎮 Entendendo o Projeto: A Arquitetura da Nuvem no PS2
-A magia acontece através da cooperação entre três dispositivos principais, cada um com uma função bem definida:
+- **o PS2Link no PS2** — o programa que o PS2 abre (pelo OPL ou pelo memory card) e que deixa o console receber
+  ordens e arquivos pela rede;
+- **uma TV box Android** — que vira o "cérebro" do desbloqueio: desenha a interface, guarda e serve os jogos e
+  faz o trabalho pesado que o PS2 não aguenta.
 
-PlayStation 2 (Cliente Magro): O PS2 não faz o trabalho pesado. Ele apenas exibe a imagem que recebe e envia os comandos do controle de volta. Ele se conecta à TV box através de rede.
+Com as duas ligadas na mesma rede, o PS2 ganha uma interface própria (o **Navegador**), com loja de jogos, jogos
+direto pela rede, emuladores, vídeos e até conquistas do RetroAchievements — sem abrir o console.
 
-TV Box Android (O Cérebro): Este é o coração do sistema. A TV box é responsável por renderizar a interface da loja (que você vê no PS2), gerenciar os arquivos e servir os jogos. Ela "desenha" a página e envia a imagem pronta para o PS2, como se fosse uma conexão remota.
+> **Importante:** como o HEN, o Henbox não é um exploit de fábrica. O PS2 precisa conseguir abrir o PS2Link
+> (por exemplo, com o OPL ou o FreeMcBoot no memory card). Veja os requisitos em [Instalação](docs/instalacao.md).
 
+## Como as peças se encaixam
 
+**PlayStation 2 (cliente magro):** não faz o trabalho pesado. Mostra a imagem que recebe e devolve os comandos do
+controle, pela rede, para a TV box.
+
+**TV box Android (o cérebro):** renderiza a interface da loja que você vê no PS2, gerencia os arquivos e serve os
+jogos. Ela "desenha" a página e envia a imagem pronta para o PS2, como numa conexão remota.
 
 ![Arquitetura](docs/arquitetura.png)
 
@@ -29,9 +41,9 @@ atraves da TV box em HTTPS.
 
 ## Baixar
 
-Arquivos prontos (pasta [`downloads/`](downloads/), também na [Release](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest)):
-[`pendrive.zip`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/raw/main/downloads/pendrive.zip) (pasta `APPS/NAVEGADOR` para o pendrive do PS2) e
-[`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/raw/main/downloads/InstaladorPS2-publico.apk) (no celular ou na própria TV box: instala tudo na
+Arquivos prontos (pasta [`downloads/`](downloads/), também na [Release](https://github.com/RodrigoRosa95/PS2-Henbox/releases/latest)):
+[`pendrive.zip`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/pendrive.zip) (pasta `APPS/NAVEGADOR` para o pendrive do PS2) e
+[`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/InstaladorPS2-publico.apk) (no celular ou na própria TV box: instala tudo na
 TV box, com o [Neutrino](https://github.com/rickgaiser/neutrino) 1.8.0 oficial, AFL-3.0). Passo a passo em
 [Instalação](docs/instalacao.md).
 

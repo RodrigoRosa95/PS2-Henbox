@@ -18,14 +18,14 @@ printf '192.168.4.230 255.255.255.0 192.168.4.1\n' > "$T/APPS/NAVEGADOR_INICIAR/
 cp capa/navegador.elf_COV.jpg "$T/ART/navegador.elf_COV.jpg"
 cp capa/navegador.elf_COV.jpg "$T/ART/NAVEGADOR_INICIAR.ELF_COV.jpg"
 cat > "$T/APPS/NAVEGADOR/LEIA-ME.txt" <<'TXT'
-ps2GamesCLoudinOPl — Navegador do PS2
+PS2 Henbox — Navegador do PS2
 Copie as pastas APPS e ART para a raiz de um pendrive FAT32.
 Para jogar pela rede: OPL → Apps → "Navegador (iniciar)". A TV box encontra o PS2 e abre o navegador sozinha em
 poucos segundos. "Navegador (direto)" abre só a loja e os vídeos (os jogos pela rede não abrem por ele).
 IP do PS2: 192.168.4.230 (máscara 255.255.255.0, gateway 192.168.4.1). Se a sua rede for outra, troque a linha do
 IPCONFIG.DAT nas duas pastas (APPS/NAVEGADOR e APPS/NAVEGADOR_INICIAR) por "IP MÁSCARA GATEWAY" — o app do celular
 mostra a linha certa no fim da instalação.
-https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl
+https://github.com/RodrigoRosa95/PS2-Henbox
 TXT
 cat > "$T/APPS/NAVEGADOR_INICIAR/LEIA-ME.txt" <<'TXT'
 NAVEGADOR_INICIAR.ELF é o PS2Link (ps2dev, Academic Free License 2.0), sem modificações, só com outro nome:

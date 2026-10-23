@@ -1,5 +1,5 @@
 #!/bin/bash
-# Servidor em nuvem do ps2GamesCLoudinOPl num PC Linux, com um comando:
+# Servidor em nuvem do PS2 Henbox num PC Linux, com um comando:
 #   servidor/instalar.sh /caminho/da/colecao [IP_DA_TV_BOX]
 # A coleção é uma pasta com DVD/ e CD/ (ISOs de PS2) e, se quiser, VIDEOS-PS2/ (vídeos já convertidos para o PS2).
 # Liga 2 serviços (PM2 se existir, senão systemd do usuário) e mostra o endereço e a chave para pôr no app do celular:
@@ -38,7 +38,7 @@ else
         IFS=: read -r nome prog dir <<<"$s"
         cat > "$U/$nome.service" <<UNIT
 [Unit]
-Description=ps2GamesCLoudinOPl $nome
+Description=PS2 Henbox $nome
 After=network-online.target
 [Service]
 EnvironmentFile=$ENV

@@ -10,7 +10,7 @@ PASTA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'navegador')
 ARQ = os.path.join(PASTA, 'videos_https.chaves.json')
 ARQ_USO = os.path.join(PASTA, 'videos_https.uso.json')
 SERVIDOR = 'https://ps2videos.rodrigoflix.com'
-DOWNLOADS = 'https://github.com/RodrigoRosa95/ps2GamesCLoudinOPl/releases/latest'
+DOWNLOADS = 'https://github.com/RodrigoRosa95/PS2-Henbox/releases/latest'
 _trava = threading.Lock()
 
 
