@@ -58,7 +58,7 @@ atraves da TV box em HTTPS.
 
 O app mostra um **🩺 estado** com ✅/❌ e o que fazer; a TV box **se atualiza sozinha** por esta pasta
 [`downloads/`](downloads/); conquistas, servidor em nuvem (Linux ou **Docker**, pareado por **QR**) são opcionais.
-Passo a passo em [Instalação](docs/instalacao.md). Também há o
+Passo a passo e telas em [Instalação](docs/instalacao.md#telas). Também há o
 [`pendrive.zip`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/pendrive.zip) para preparar o pendrive pelo PC.
 
 ## Documentação

@@ -525,11 +525,18 @@ class H(BaseHTTPRequestHandler):
             if u.path.endswith('.json'):
                 return self.json(itens)
             sinal = {True: '✅', False: '❌', None: '➖'}
-            linhas = ''.join(f'<div class="b"><b>{sinal[i["ok"]]} {html.escape(i["item"])}</b>'
-                             f'<div class="p">{html.escape(i["detalhe"])}</div>'
-                             + (f'<div class="p">👉 {html.escape(i["resolver"])}</div>' if i['resolver'] else '') + '</div>'
+            # compacto: uma linha por item, cabe na tela do PS2 (640x448) quase sem rolar
+            linhas = ''.join(f'<div class="it {"ok" if i["ok"] else "nao" if i["ok"] is False else ""}">'
+                             f'<b>{sinal[i["ok"]]} {html.escape(i["item"])}</b> <span>{html.escape(i["detalhe"])}</span>'
+                             + (f'<div class="r">👉 {html.escape(i["resolver"])}</div>' if i['resolver'] else '') + '</div>'
                              for i in itens)
-            self.pagina('<meta http-equiv="refresh" content="20"><h1>🩺 Estado do PS2 Henbox</h1><div class="lista">'
+            faltam = sum(1 for i in itens if i['ok'] is False)
+            self.pagina('<meta http-equiv="refresh" content="20"><style>.it{margin:0 0 5px;padding:5px 12px;'
+                        'background:#13264f;border-radius:9px;font-size:15px;line-height:1.3;border-left:4px solid #5b6b8c}'
+                        '.it.ok{border-color:#3fb950}.it.nao{border-color:#f85149}.it span{color:#9fb4e0}'
+                        '.it .r{color:#ffd166;font-size:14px}.lista{height:372px}h1{margin:10px 20px 8px;font-size:24px}'
+                        '</style><h1>🩺 Estado do PS2 Henbox · '
+                        + ('tudo certo ✅' if not faltam else f'{faltam} a resolver ❌') + '</h1><div class="lista">'
                         + linhas + '<a class="b" href="/">← Voltar</a></div>')
         elif u.path == '/conquistas/api/desbloqueios':   # ?desde=<epoch>: o assistente do Xoom faz o pop-up
             try:

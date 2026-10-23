@@ -33,6 +33,20 @@ Opcionais:
 **Atualizações:** a TV box confere a pasta `downloads/` deste repositório ao ligar e uma vez por dia, se atualiza
 sozinha e depois atualiza o `navegador.elf` do pendrive do PS2 na próxima conexão.
 
+### Telas
+
+| App PS2 Henbox | 🩺 Estado completo |
+| --- | --- |
+| ![Início do app](telas/automacao/app-1-inicio.png) | ![Estado completo](telas/automacao/app-2-estado-completo.png) |
+| **Pendrive pela TV box e conquistas** | **IP do PS2** |
+| ![Pendrive e conquistas](telas/automacao/app-3-pendrive-e-conquistas.png) | ![IP do PS2](telas/automacao/app-4-ps2-ip.png) |
+| **Conquistas no app** | **Voz opcional depois do plim** |
+| ![Conquistas](telas/automacao/app-5-conquistas.png) | ![Opção de voz](telas/automacao/app-6-opcao-voz.png) |
+| **/estado na tela do PS2 (640x448)** | **Pareamento do servidor por QR** (exemplo) |
+| ![Estado no PS2](telas/automacao/pagina-estado-ps2.png) | ![QR](telas/automacao/servidor-qr-pareamento.png) |
+
+Troféu no tablet (Xoom Show) com o plim e a voz: ![Troféu no Show](telas/automacao/xoom-show-trofeu.png)
+
 O resto desta página é o detalhe de cada passo.
 
 ## Requisitos
