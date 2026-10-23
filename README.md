@@ -51,6 +51,9 @@ atraves da TV box em HTTPS.
 
 ## Instalar (sem PC)
 
+🎬 **Vídeo:** [apresentação e instalação do zero (3 min)](docs/video/PS2-Henbox-tutorial.mp4) — narrado, com as telas reais
+do sistema ([como foi montado](docs/video/montar_video.py)).
+
 1. Instale o app **PS2 Henbox** ([`InstaladorPS2-publico.apk`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/InstaladorPS2-publico.apk))
    no celular → **Procurar TV boxes** → **Instalar / atualizar tudo**.
 2. Espete um pendrive na TV box → **Preparar pendrive** → ponha no PS2.
