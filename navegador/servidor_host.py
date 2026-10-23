@@ -19,13 +19,8 @@ PS2Link abre o navegador (22/10/2026): se o PS2 estiver no PS2Link (porta TCP 0x
 este programa faz o papel do ps2client — serve host: e manda o comando execee (UDP 0x4712) "host:navegador.elf rede".
 O navegador aberto assim é o caminho que abre os jogos pela rede (aberto direto pelo OPL, o Neutrino travava).
 PS2_AUTO_NAVEGADOR=0 desliga.
-
-Vídeos remotos (17/10/2026, TV box fora de casa): host:video/remoto/<arquivo> é lido do videos_https.py do notebook,
-pelos endereços de remoto.json ({"urls": ["http://192.168.4.135:8781", "https://ps2videos.rodrigoflix.com"],
-"chave": "..."}, o primeiro que responder). Uma thread por arquivo busca pedaços de 512 KB à frente (até 4 MB), para
-o PS2 não esperar uma ida e volta pela internet a cada leitura.
 """
-import http.client, json, os, re, socket, stat, struct, subprocess, sys, threading, time, urllib.parse
+import os, re, socket, stat, struct, subprocess, sys, threading, time
 
 PS2 = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('PS2_IP', '192.168.4.230')
 PORTA = 0x4721
@@ -34,8 +29,6 @@ EXECEE = 0xBABE0203
 AUTO_NAVEGADOR = os.environ.get('PS2_AUTO_NAVEGADOR', '1') != '0'
 RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ps2')
 CAB = struct.Struct('>IH')
-REMOTO = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'remoto.json')
-PEDACO, FOLGA = 512 * 1024, 4 * 1024 * 1024
 
 
 def log(*a):
@@ -51,93 +44,6 @@ def caminho(nome):
     if final != RAIZ and not final.startswith(RAIZ + os.sep):
         raise PermissionError(nome)
     return final
-
-
-def remoto_cfg():
-    try:
-        return json.load(open(REMOTO))
-    except (OSError, ValueError):
-        return None
-
-
-_url_boa = ['']   # o último endereço que respondeu vai primeiro (casa ↔ fora)
-
-
-class Remoto:
-    """Arquivo do notebook por HTTP(S) com leitura antecipada (só leitura sequencial, como o player faz)."""
-
-    def __init__(self, nome):
-        cfg = remoto_cfg()
-        if not cfg:
-            raise OSError('sem remoto.json')
-        self.chave, self.nome, self.erro = cfg['chave'], urllib.parse.quote(nome), None
-        for url in sorted(cfg['urls'], key=lambda u: u != _url_boa[0]):   # casa: rede local; fora: Cloudflare
-            try:
-                self.url = urllib.parse.urlparse(url)
-                c = self._conexao(3 if self.url.scheme == 'http' else 15)   # rede local fora do alcance: desiste logo
-                c.request('HEAD', f'/arquivo/{self.nome}', headers={'X-Chave': self.chave})
-                r = c.getresponse(); r.read()
-                if r.status == 200:
-                    self.tam = int(r.getheader('Content-Length', '0'))
-                    _url_boa[0] = url
-                    break
-                if r.status == 404:
-                    raise FileNotFoundError(nome)
-            except FileNotFoundError:
-                raise
-            except Exception as e:
-                log('remoto', url, e)
-        else:
-            raise OSError('notebook fora do alcance')
-        self.pos = 0                      # o que o PS2 já leu
-        self.buf, self.buf_ini = bytearray(), 0
-        self.cond, self.fechado = threading.Condition(), False
-        threading.Thread(target=self._baixar, daemon=True).start()
-
-    def _conexao(self, timeout=20):
-        Cls = http.client.HTTPSConnection if self.url.scheme == 'https' else http.client.HTTPConnection
-        return Cls(self.url.netloc, timeout=timeout)
-
-    def _baixar(self):
-        c, prox = self._conexao(), 0
-        while not self.fechado and prox < self.tam:
-            with self.cond:
-                while not self.fechado and prox - self.pos >= FOLGA:
-                    self.cond.wait(1)
-            if self.fechado:
-                break
-            fim = min(prox + PEDACO, self.tam) - 1
-            try:
-                c.request('GET', f'/arquivo/{self.nome}', headers={'X-Chave': self.chave, 'Range': f'bytes={prox}-{fim}'})
-                r = c.getresponse(); d = r.read()
-                if r.status not in (200, 206) or not d:
-                    raise OSError(f'HTTP {r.status}')
-            except Exception as e:
-                log('remoto: leitura', self.nome, e)
-                c.close(); time.sleep(1); c = self._conexao()
-                continue
-            with self.cond:
-                self.buf += d
-                prox += len(d)
-                self.cond.notify_all()
-
-    def read(self, n):
-        with self.cond:
-            while not self.fechado and self.pos < self.tam and self.buf_ini + len(self.buf) <= self.pos:
-                self.cond.wait(1)
-            ini = self.pos - self.buf_ini
-            d = bytes(self.buf[ini:ini + n])
-            self.pos += len(d)
-            corte = self.pos - self.buf_ini - 65536   # descarta o que já foi lido (guarda 64 KB)
-            if corte > 0:
-                del self.buf[:corte]; self.buf_ini += corte
-            self.cond.notify_all()
-            return d
-
-    def close(self):
-        with self.cond:
-            self.fechado = True
-            self.cond.notify_all()
 
 
 def flags_os(f):
@@ -195,17 +101,10 @@ def servir(s):
                 try:
                     if nome.startswith('host:'):
                         nome = nome[5:].lstrip('/')
-                    if nome.startswith('video/remoto/'):
-                        if fl & 3 != 1:
-                            raise OSError('remoto só leitura')
-                        r = novo(Remoto(nome[len('video/remoto/'):]), fds)
-                    else:
-                        r = novo(os.open(caminho(corpo[4:]), flags_os(fl), 0o644), fds)
+                    r = novo(os.open(caminho(corpo[4:]), flags_os(fl), 0o644), fds)
                     if nome not in ('dif.bin', 'completa.bin', 'entrada.bin', 'pedido.bin', 'temperatura.txt'):
                         log('abriu', nome)
                 except OSError as e:
-                    if nome.startswith('video/remoto/') and not nome.endswith('.fim'):
-                        log('remoto:', nome, e)
                     r = -1
                 resp(0xbabe0112, r)
             elif cmd == 0xbabe0121:   # close
@@ -213,14 +112,14 @@ def servir(s):
                 r = -1
                 if fd in fds:
                     f = fds.pop(fd)
-                    f.close() if isinstance(f, Remoto) else os.close(f)
+                    os.close(f)
                     r = 0
                 resp(0xbabe0122, r)
             elif cmd == 0xbabe0131:   # read
                 fd, n = struct.unpack('>ii', corpo[:8])
                 try:
                     f = fds[fd]
-                    dados = f.read(max(0, n)) if isinstance(f, Remoto) else os.read(f, max(0, n))
+                    dados = os.read(f, max(0, n))
                     resp(0xbabe0132, len(dados), len(dados), extra=dados, conta_extra=False)
                 except (KeyError, OSError):
                     resp(0xbabe0132, -1, 0)
@@ -236,7 +135,7 @@ def servir(s):
                 fd, ofs, de = struct.unpack('>iii', corpo[:12])
                 try:
                     f = fds[fd]
-                    r = (f.tam if de == 2 else f.pos) if isinstance(f, Remoto) else os.lseek(f, ofs, de)
+                    r = os.lseek(f, ofs, de)
                 except (KeyError, OSError):
                     r = -1
                 resp(0xbabe0152, r)
@@ -284,7 +183,7 @@ def servir(s):
                 return
     finally:
         for f in fds.values():
-            f.close() if isinstance(f, Remoto) else os.close(f)
+            os.close(f)
 
 
 def redes_locais():

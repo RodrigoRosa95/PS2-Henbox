@@ -1,16 +1,16 @@
 #!/bin/bash
 # Servidor em nuvem do PS2 Henbox num PC Linux, com um comando:
 #   servidor/instalar.sh /caminho/da/colecao [IP_DA_TV_BOX]
-# A coleção é uma pasta com DVD/ e CD/ (ISOs de PS2) e, se quiser, VIDEOS-PS2/ (vídeos já convertidos para o PS2).
+# A coleção é uma pasta com DVD/ e CD/ (ISOs de PS2).
 # Liga 2 serviços (PM2 se existir, senão systemd do usuário) e mostra o endereço e a chave para pôr no app do celular:
-#   loja (servidor.py, porta 8770) e vídeos/ROMs/ISOs/loja para a TV box (navegador/videos_https.py, porta 8781).
+#   loja (servidor.py, porta 8770) e ROMs/ISOs/loja para a TV box (navegador/videos_https.py, porta 8781).
 # Para acessar de fora de casa: túnel Cloudflare (ou outro HTTPS) apontando para a porta 8781 — ver docs/instalacao.md.
 set -e
 RAIZ=$(cd "$(dirname "$0")/.." && pwd)
 COLECAO=${1:?uso: servidor/instalar.sh /caminho/da/colecao [IP_DA_TV_BOX]}
 COLECAO=$(cd "$COLECAO" && pwd)
 TVBOX=${2:-}
-mkdir -p "$COLECAO/DVD" "$COLECAO/CD" "$COLECAO/VIDEOS-PS2"
+mkdir -p "$COLECAO/DVD" "$COLECAO/CD"
 
 command -v python3 >/dev/null || { echo "Instale o Python 3 (ex.: sudo apt install python3)"; exit 1; }
 python3 -c 'import PIL' 2>/dev/null || echo "Aviso: sem o Pillow (sudo apt install python3-pil) as capas do cinema não são geradas."
@@ -18,7 +18,6 @@ python3 -c 'import PIL' 2>/dev/null || echo "Aviso: sem o Pillow (sudo apt insta
 ENV="$RAIZ/servidor/servidor.env"
 cat > "$ENV" <<CFG
 PS2_JOGOS=$COLECAO
-PS2_VIDEOS=$COLECAO/VIDEOS-PS2
 PS2_TVBOX=${TVBOX:-127.0.0.1}
 PS2_NAV_IP=${TVBOX:-127.0.0.1}
 CFG

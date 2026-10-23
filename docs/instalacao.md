@@ -123,13 +123,13 @@ Num PC Linux com Python 3, na pasta do repositório:
 servidor/instalar.sh /pasta/da/colecao [IP_DA_TV_BOX]
 ```
 
-Ele cria `DVD/`, `CD/` e `VIDEOS-PS2/` na coleção, liga os serviços (PM2, ou systemd do usuário) e mostra o
+Ele cria `DVD/` e `CD/` na coleção, liga os serviços (PM2, ou systemd do usuário) e mostra o
 **endereço** e a **chave** para pôr no app do celular. Os ISOs vão em `DVD/` e `CD/`.
 
 | Serviço | Arquivo | Porta | Pasta da coleção |
 | --- | --- | --- | --- |
 | Loja e catálogo | `servidor.py` | 8770 | — |
-| Vídeos, ROMs, ISOs e loja para a TV box | `navegador/videos_https.py` | 8781 | `PS2/DVD`, `PS2/CD`, `PS2/VIDEOS-PS2` (variáveis `PS2_JOGOS` e `PS2_VIDEOS`) |
+| ROMs, ISOs e loja para a TV box | `navegador/videos_https.py` | 8781 | `PS2/DVD`, `PS2/CD` (variável `PS2_JOGOS`) |
 | Acesso fora de casa | túnel Cloudflare (`cloudflared`) | → 8781 | — |
 
 **Fora de casa:** crie um túnel HTTPS (ex.: Cloudflare Tunnel) para a porta 8781 e use o endereço `https://…` no app.
@@ -140,7 +140,7 @@ A chave fica em `navegador/videos_https.chave`.
 É assim que o servidor do autor está montado. Troque o domínio e a chave pelos seus: a chave dá acesso a todos os
 jogos da coleção, por isso a de verdade não vai aqui.
 
-1. Coleção num HD do PC: `/media/rodrigo/01TERA/PS2` com `DVD/`, `CD/` e `VIDEOS-PS2/`.
+1. Coleção num HD do PC: `/media/rodrigo/01TERA/PS2` com `DVD/` e `CD/`.
 2. No PC:
 
    ```

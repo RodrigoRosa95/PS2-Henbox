@@ -41,7 +41,7 @@ A TV box (Android com root, 192.168.4.121) faz o que antes era do notebook: dese
 | --- | --- | --- |
 | App **PS2 Navegador** (`br.ps2nav`) | WebView numa tela virtual invisível de 640x448; ponte para o DevTools do WebView e saída crua dos quadros | 9222 (DevTools), 9223 (quadros RGBA) |
 | `navegador_servidor.py` | comanda o WebView pelo DevTools, recorta as mudanças da tela, grava `dif.bin`, lê `entrada.bin` e transforma em clique/tecla; fila de pedidos | 8772 (controle: `status`, `loja`, `copiar2`, `jogar`, `neutrino`, `video`, `sair`) |
-| `servidor_host.py` | servidor de arquivos `host:` (protocolo do ps2client); conecta no PS2 e, se o IP não responder, procura o PS2 nas redes locais; `video/remoto/*` vem do notebook por HTTP(S) com 4 MB à frente | cliente da 0x4721 do PS2 |
+| `servidor_host.py` | servidor de arquivos `host:` (protocolo do ps2client); conecta no PS2 e, se o IP não responder, procura o PS2 nas redes locais | cliente da 0x4721 do PS2 |
 | `videos.py` | página inicial (Loja e Vídeos); proxy da loja do notebook com a chave; ações de SNES e de jogo de PS2 executadas aqui | 8780 |
 | `udpfs_nuvem.py` | servidor oficial do Neutrino (`udpfs_server.py`) servindo o pendrive da box; ISO ausente vem do notebook em blocos de 1 MB (cache de 48, 3 à frente) | UDP 62966 |
 | `configurar.py` | `config.json` único: IP do PS2, endereços do notebook, chave; gera `remoto.json`, `IPCONFIG.DAT` e o `ip=` do Neutrino; `estado` em JSON para o app do celular | — |
@@ -58,7 +58,7 @@ O notebook guarda o conteúdo (jogos, ROMs, vídeos, catálogo) e o entrega só 
 
 | Serviço (PM2) | O que entrega | Endereço |
 | --- | --- | --- |
-| `ps2-videos` (`videos_https.py`) | `/lista` e `/arquivo/<id>` (vídeos `.m2v`/`.pcm` de `01TERA/PS2/VIDEOS-PS2`), `/loja/<lista fixa>` (página, catálogo, capas — só GET), `/rom/<arquivo>` (ROM de SNES), `/iso/DVD/<arquivo>` (ISO de PS2, com Range) | :8781 na rede local; `https://ps2videos.rodrigoflix.com` pelo túnel Cloudflare |
+| `ps2-videos` (`videos_https.py`) | `/loja/<lista fixa>` (página, catálogo, capas — só GET), `/rom/<arquivo>` (ROM de SNES), `/iso/DVD/<arquivo>` (ISO de PS2, com Range) | :8781 na rede local; `https://ps2videos.rodrigoflix.com` pelo túnel Cloudflare |
 | `ps2-web` (`servidor.py`) | a loja original (`loja.html`, catálogo, instalação de ISO no pendrive da box de casa por ADB) | :8770 (só na rede local) |
 | Jellyfin | filmes e séries (o Cinema converte para o PS2 com ffmpeg, só no notebook) | :8096 |
 

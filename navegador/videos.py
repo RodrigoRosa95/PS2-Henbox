@@ -3,8 +3,7 @@
 (<id>.m2v MPEG-2 640x400 + <id>.pcm PCM 16 bits estéreo 22050 Hz + <id>.fim + <id>.json {"titulo"}), sem conversão.
 Página inicial do navegador na box (porta 8780): botões Loja e Vídeos; tocar = manda "video <id>" ao
 navegador_servidor (porta 8772), que pede ao PS2 host:video/<id>.m2v/.pcm (servidos pelo servidor_host.py).
-Vídeos em ps2/video/ (na box) e, se houver remoto.json, os do notebook (videos_https.py: rede local em casa,
-https://ps2videos.rodrigoflix.com fora), tocados como host:video/remoto/<id> pelo servidor_host.py.
+Vídeos só os de ps2/video/ (na box). O vídeo do notebook por HTTPS foi retirado em 22/10/2026 (travava demais).
 Loja (/loja/...): a página, o catálogo e as capas vêm do notebook (videos_https.py /loja, rede local ou HTTPS, com
 a chave); as ações de SNES rodam AQUI (baixa a ROM do notebook se faltar e manda o navegador gravar no pendrive do
 PS2 / jogar); as de jogos de PS2 (ISO na TV box de casa) só funcionam com o notebook na mesma rede.
@@ -41,30 +40,6 @@ def lista():
                 titulo = vid
             mb = (os.path.getsize(os.path.join(VIDEOS, nome)) + os.path.getsize(os.path.join(VIDEOS, vid + '.pcm'))) >> 20
             vs.append({'id': vid, 'titulo': titulo, 'mb': mb})
-    return vs
-
-
-_cache_remoto = [0, []]
-
-
-def lista_remota():
-    """Vídeos do notebook (guarda 30 s; vazio se o notebook estiver fora do alcance)."""
-    if time.time() - _cache_remoto[0] < 30:
-        return _cache_remoto[1]
-    vs = []
-    try:
-        cfg = json.load(open(os.path.join(PASTA, 'remoto.json')))
-        for url in sorted(cfg['urls'], key=lambda u: u != _url_boa[0]):
-            try:
-                req = urllib.request.Request(url.rstrip('/') + '/lista', headers={'X-Chave': cfg['chave'], 'User-Agent': UA})
-                vs = json.load(urllib.request.urlopen(req, timeout=3 if url.startswith('http:') else 10))
-                _url_boa[0] = url
-                break
-            except Exception:
-                continue
-    except (OSError, ValueError):
-        pass
-    _cache_remoto[:] = [time.time(), vs]
     return vs
 
 
@@ -220,14 +195,11 @@ class H(BaseHTTPRequestHandler):
         elif u.path == '/videos':
             itens = ''.join(f'<a class="b" href="/tocar?id={urllib.parse.quote(v["id"])}">{html.escape(v["titulo"])}'
                             f'<div class="p">{v["mb"]} MB · na TV box</div></a>' for v in lista())
-            itens += ''.join(f'<a class="b" href="/tocar?id=remoto/{urllib.parse.quote(v["id"])}">'
-                             f'{html.escape(v["titulo"])}<div class="p">{v["mb"]} MB · do servidor em nuvem</div></a>'
-                             for v in lista_remota())
             self.pagina('<h1>🎬 Vídeos</h1><div class="lista"><a class="b" href="/">← Voltar</a>'
                         + (itens or '<div class="msg">Nenhum vídeo em ps2/video na TV box.</div>') + '</div>')
         elif u.path == '/tocar':
             vid = (q.get('id') or [''])[0]
-            validos = {v['id'] for v in lista()} | {'remoto/' + v['id'] for v in lista_remota()}
+            validos = {v['id'] for v in lista()}
             if vid not in validos:
                 return self.pagina('<div class="msg">Vídeo não encontrado.</div><a class="b" href="/videos">← Voltar</a>')
             r = navegador(f'video {vid}')
