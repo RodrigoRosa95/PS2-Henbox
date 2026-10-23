@@ -28,6 +28,14 @@ jogos. Ela "desenha" a página e envia a imagem pronta para o PS2, como numa con
 **Veja o link demonstratibo de loja:** [(apenas visualização)](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb). São
 os jogos da coleção pessoal do autor; nada é baixado nesse link demonstrativo. Jogar e baixar funcionam apenas no PS2.
 
+## 🏆 Conquistas RetroAchievements no PS2 real
+
+Com o app [xeRAbora](https://github.com/hacan359/xerabora) na TV box, os jogos ganham **conquistas do
+RetroAchievements no PS2 de verdade** — e o Henbox prepara tudo sozinho: a TV box calcula o hash dos ISOs, busca a
+lista de conquistas e manda para o pendrive do PS2, sem abrir o menu do OPL. No navegador: **⬇ Copiar para o PS2**,
+**▶ Jogar** e a página **🏆 Conquistas** com o progresso e as medalhas. Testado no PS2 real com o Black (60 leituras
+por segundo, 56 conquistas acompanhadas). Detalhes em [Conquistas](docs/conquistas.md).
+
 ## Telas (como aparecem no PS2, 640x448)
 
 | Menu | Loja |
@@ -51,6 +59,7 @@ TV box, com o [Neutrino](https://github.com/rickgaiser/neutrino) 1.8.0 oficial, 
 
 - [Instalação](docs/instalacao.md) — requisitos e o que vai no memory card, no pendrive do PS2, na TV box e no servidor
 - [Fluxo técnico do sistema](docs/fluxo-tecnico.md) — peças, portas, protocolos, fluxos e problemas resolvidos
+- [Conquistas RetroAchievements](docs/conquistas.md) — preparação automática, OPL-RA do Henbox e página de conquistas
 - [Guia para novo usuário](docs/guia-novo-usuario.md) — uso, controles, problemas comuns e roteiro de apresentação
 
 ## Estrutura

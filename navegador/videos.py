@@ -9,7 +9,7 @@ a chave); as ações de SNES rodam AQUI (baixa a ROM do notebook se faltar e man
 PS2 / jogar); as de jogos de PS2 (ISO na TV box de casa) só funcionam com o notebook na mesma rede.
 Uso: videos.py [porta]
 """
-import html, json, os, socket, sys, time, urllib.error, urllib.parse, urllib.request
+import html, json, os, re, socket, sys, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
@@ -80,6 +80,210 @@ def navegador(pedido):
             return c.makefile().readline().strip()
     except OSError as e:
         return f'navegador fora do ar ({e})'
+
+
+# ---------- 🏆 Conquistas (23/10/2026): página montada aqui com os dados do app xeRAbora desta box ----------
+XERABORA = 'http://127.0.0.1:18280'
+INDICE_RA = os.path.join(PASTA, 'ps2', 'ra', 'indice.json')   # jogos preparados: serial → título, total, id no RA
+BADGE = '/conquistas/medalha/'   # servidas daqui (cache em ps2/ra/medalhas), vindas do site do RetroAchievements
+BADGE_ORIGEM = 'https://media.retroachievements.org/Badge/'
+PASTA_MEDALHAS = os.path.join(PASTA, 'ps2', 'ra', 'medalhas')
+
+
+def medalha(nome):
+    """PNG da medalha ("609317" ou "609317_lock"), baixado uma vez e guardado; None se não der."""
+    if not re.fullmatch(r'\d{1,9}(_lock)?', nome):
+        return None
+    arq = os.path.join(PASTA_MEDALHAS, nome + '.png')
+    if not os.path.exists(arq):
+        try:
+            req = urllib.request.Request(BADGE_ORIGEM + nome + '.png', headers={'User-Agent': 'PS2-Henbox'})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                d = r.read()
+        except Exception:
+            return None
+        os.makedirs(PASTA_MEDALHAS, exist_ok=True)
+        with open(arq + '.tmp', 'wb') as f:
+            f.write(d)
+        os.replace(arq + '.tmp', arq)
+    return open(arq, 'rb').read()
+
+
+def xera(caminho):
+    try:
+        with urllib.request.urlopen(XERABORA + caminho, timeout=8) as r:
+            return json.loads(r.read())
+    except Exception:
+        return None
+
+
+def indice_ra():
+    try:
+        return json.load(open(INDICE_RA, encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+
+
+def registrar_preparado(serial, titulo, iso):
+    """Depois do preparar: guarda o jogo no índice da página de conquistas, com o id dele no RetroAchievements
+    (pelo hash do ISO, a mesma consulta "gameid" que os emuladores fazem) e os dados do app xeRAbora."""
+    from ra_hash import hash_ps2
+    ind = indice_ra()
+    item = ind.get(serial, {})
+    nome, _, resto = titulo.partition(' — ')
+    item.update({'titulo': nome, 'quando': time.strftime('%d/%m/%Y')})
+    try:
+        h = hash_ps2(iso)[0]
+        req = urllib.request.Request(f'https://retroachievements.org/dorequest.php?r=gameid&m={h}',
+                                     headers={'User-Agent': 'PS2-Henbox/1.0'})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            jid = json.loads(r.read()).get('GameID')
+        if jid:
+            g = xera(f'/game?id={int(jid)}') or {}
+            item.update({'id': int(jid), 'hash': h, 'nome': g.get('title') or nome,
+                         'total': g.get('total') or len(g.get('achievements') or [])})
+    except Exception:
+        pass
+    item.pop('sem', None)
+    ind[serial] = item
+    salvar_indice(ind)
+
+
+def salvar_indice(ind):
+    os.makedirs(os.path.dirname(INDICE_RA), exist_ok=True)
+    with open(INDICE_RA + '.tmp', 'w', encoding='utf-8') as f:
+        json.dump(ind, f, ensure_ascii=False, indent=1)
+    os.replace(INDICE_RA + '.tmp', INDICE_RA)
+
+
+REVER_SEM_CONQUISTAS = 7 * 86400   # ISO que o RetroAchievements não reconheceu: tenta de novo uma vez por semana
+
+
+def varrer_conquistas():
+    """Prepara sozinho as conquistas dos ISOs do pendrive desta box que ainda não estão no índice (ISO instalado
+    pela loja, copiado à mão…): hash, lista do xeRAbora em ps2/ra/<serial>.wl e o jogo na página 🏆. Não depende
+    do PS2 ligado; a lista vai para o pendrive do PS2 no "Copiar para o PS2". Pula enquanto um jogo transmite
+    (preparar troca o jogo que o app xeRAbora está servindo)."""
+    from ra_hash import hash_ps2
+    from ra_preparar import preparar
+    pasta = os.path.realpath(os.path.join(PASTA, 'ps2', 'jogos-box'))
+    for nome in sorted(os.listdir(pasta)):
+        if not nome.lower().endswith('.iso'):
+            continue
+        console = (xera('/state') or {}).get('console') or {}
+        if console.get('connected') and console.get('frames'):
+            return
+        iso = os.path.join(pasta, nome)
+        try:
+            serial = hash_ps2(iso)[1]
+        except Exception:
+            continue
+        e = indice_ra().get(serial) or {}
+        if e.get('id') or (e.get('sem') and time.time() - e.get('t', 0) < REVER_SEM_CONQUISTAS):
+            continue
+        try:
+            _, titulo = preparar(iso, serial, os.path.join(PASTA, 'ps2', 'ra'), log=lambda *a: None)
+            registrar_preparado(serial, titulo, iso)
+            print(f'conquistas preparadas sozinhas: {nome} → {titulo}', flush=True)
+        except Exception as ex:
+            ind = indice_ra()
+            ind[serial] = {'titulo': nome, 'sem': str(ex)[:160], 't': time.time()}
+            salvar_indice(ind)
+
+
+def laco_conquistas():
+    time.sleep(60)
+    while True:
+        try:
+            varrer_conquistas()
+        except Exception as e:
+            print('varredura de conquistas:', e, flush=True)
+        time.sleep(30 * 60)
+
+
+ESTILO_RA = ('<style>.topo{margin:6px 20px 10px;color:#9fb4e0;font-size:16px} .topo b{color:#ffd166}'
+             '.c{display:flex;align-items:center;gap:12px;margin:0 0 10px;padding:8px 12px;background:#132a57;'
+             'border-radius:10px} .c img{width:48px;height:48px;border-radius:6px;flex:none} .c .t{font-size:18px}'
+             '.c .d{color:#9fb4e0;font-size:14px} .c.ganha{background:#3a3010} .c.ganha .t{color:#ffd166}'
+             '.barra{height:8px;background:#0b1630;border-radius:4px;margin-top:6px;overflow:hidden}'
+             '.barra i{display:block;height:100%;background:#ffd166}</style>')
+
+
+def pagina_no_ps2(msg=''):
+    """💾 Jogos no pendrive do PS2 (ps2/no-ps2.json, anotados pelo navegador_servidor nas cópias) com ▶ Jogar direto."""
+    try:
+        jogos = json.load(open(os.path.join(PASTA, 'ps2', 'no-ps2.json'), encoding='utf-8'))
+    except (OSError, ValueError):
+        jogos = {}
+    ind, itens = indice_ra(), ''
+    for arq in sorted(jogos, key=lambda a: a[12:].lower() if re.match(r'^[A-Z]{4}_\d{3}\.\d{2}\.', a) else a.lower()):
+        serial = arq[:11] if re.match(r'^[A-Z]{4}_\d{3}\.\d{2}\.', arq) else ''
+        nome = os.path.splitext(arq[12:] if serial else arq)[0]
+        ra = ind.get(serial) or {}
+        tag = f'🏆 {ra.get("total", "")} conquistas · ' if ra.get('id') else ''
+        itens += (f'<a class="b" href="/no-ps2/jogar?arquivo={urllib.parse.quote(arq)}">▶ {html.escape(nome)}'
+                  f'<div class="p">{tag}{html.escape(serial or "sem código")} · copiado em {html.escape(jogos[arq].get("quando", ""))}</div></a>')
+    if not itens:
+        itens = '<div class="msg">Nenhum jogo copiado ainda. Na Loja, use ⬇ Copiar para o PS2.</div>'
+    aviso = f'<div class="msg">{html.escape(msg)}</div>' if msg else ''
+    return '<h1>💾 No pendrive do PS2</h1>' + aviso + '<div class="lista"><a class="b" href="/">← Voltar</a>' + itens + '</div>'
+
+
+def pagina_conquistas():
+    perfil, st = xera('/profile'), xera('/state')
+    if perfil is None or st is None:
+        return ('<h1>🏆 Conquistas</h1><div class="msg">O app xeRAbora não está respondendo nesta TV box.</div>'
+                '<div class="lista"><a class="b" href="/">← Voltar</a></div>')
+    topo = (f'<div class="topo">👤 {html.escape(perfil.get("user") or "?")} · <b>{perfil.get("points", 0)} pontos</b>'
+            + (f' · {html.escape(perfil["presence"])}' if perfil.get('presence') else '') + '</div>')
+    itens, vistos = '', set()
+    for u in (st.get('unlocks') or [])[-5:][::-1]:   # desbloqueadas agora, na sessão
+        itens += (f'<div class="c ganha"><img src="{BADGE}{html.escape(str(u.get("badge", "")))}.png">'
+                  f'<div><div class="t">🏆 {html.escape(u.get("title") or "")}</div>'
+                  f'<div class="d">{html.escape(u.get("description") or "")}</div></div></div>')
+    jogos = []
+    g = st.get('game') or {}
+    if g.get('id'):
+        conq = g.get('achievements') or []
+        ganhas = sum(1 for a in conq if str(a.get('state', '')).lower() in ('unlocked', 'earned', 'won'))
+        jogos.append((g['id'], g.get('title'), ganhas, len(conq), '▶ jogando agora' if (st.get('console') or {}).get('frames') else 'último jogo identificado'))
+    for j in ((xera('/library') or {}).get('games') or []):
+        jid = j.get('id') or j.get('game_id')
+        if jid:
+            jogos.append((jid, j.get('title'), j.get('awarded') or j.get('earned') or 0, j.get('total') or 0, 'na sua biblioteca'))
+    for serial, j in sorted(indice_ra().items(), key=lambda x: x[1].get('titulo', '')):
+        if j.get('id'):
+            jogos.append((j['id'], j.get('nome') or j.get('titulo'), None, j.get('total') or 0, f'preparado no PS2 · {serial}'))
+    for jid, titulo, ganhas, total, onde in jogos:
+        if jid in vistos:
+            continue
+        vistos.add(jid)
+        pct = int(100 * (ganhas or 0) / total) if total and ganhas is not None else 0
+        info = f'{ganhas} de {total} conquistas' if ganhas is not None else f'{total} conquistas'
+        itens += (f'<a class="b" href="/conquistas/jogo?id={int(jid)}">{html.escape(titulo or "?")}'
+                  f'<div class="p">{info} · {html.escape(onde)}</div><div class="barra"><i style="width:{pct}%"></i></div></a>')
+    if not jogos:
+        itens += '<div class="msg">Nenhum jogo ainda. Na Loja, use 🏆 Preparar conquistas num jogo.</div>'
+    return ('<h1>🏆 Conquistas</h1>' + ESTILO_RA + topo + '<div class="lista"><a class="b" href="/">← Voltar</a>'
+            + itens + '</div>')
+
+
+def pagina_jogo_ra(jid):
+    g = xera(f'/game?id={int(jid)}')
+    if not g:
+        return '<h1>🏆</h1><div class="msg">Não consegui ler esse jogo.</div><a class="b" href="/conquistas">← Voltar</a>'
+    conq = sorted(g.get('achievements') or [], key=lambda a: (not a.get('earned'), a.get('order') or 0))
+    itens = ''
+    for a in conq:
+        ganha = bool(a.get('earned'))
+        img = f'{BADGE}{html.escape(str(a.get("badge", "")))}{"" if ganha else "_lock"}.png'
+        quando = f' · {html.escape(str(a["earned"])[:10])}' if ganha else ''
+        itens += (f'<div class="c{" ganha" if ganha else ""}"><img src="{img}"><div>'
+                  f'<div class="t">{html.escape(a.get("title") or "")} · {a.get("points", 0)} pts</div>'
+                  f'<div class="d">{html.escape(a.get("description") or "")}{quando}</div></div></div>')
+    topo = f'<div class="topo"><b>{g.get("awarded", 0)} de {g.get("total", len(conq))}</b> desbloqueadas</div>'
+    return (f'<h1>{html.escape(g.get("title") or "🏆")}</h1>' + ESTILO_RA + topo
+            + '<div class="lista"><a class="b" href="/conquistas">← Voltar</a>' + itens + '</div>')
 
 
 class H(BaseHTTPRequestHandler):
@@ -162,6 +366,51 @@ class H(BaseHTTPRequestHandler):
                 return self.json({'ok': False, 'msg': 'jogo não encontrado no catálogo'})
             r = navegador('neutrino ' + jogo['arquivo'])
             return self.json({'ok': r == 'ok', 'msg': f'Abrindo {jogo["nome"]} no PS2 (jogo em nuvem)…' if r == 'ok' else r})
+        if acao in ('api/jogar-ra', 'api/menu-ra', 'api/copiar-ra', 'api/preparar-ra'):
+            # 🏆 conquistas (xeRAbora, 23/10/2026): OPL-RA-SMB.ELF (~/ps2-monitor/opl-ra) abre o jogo direto e manda a
+            # memória dele ao app xeRAbora desta box. Pelo Samba o xeRAbora ainda não funciona (rede disputada, tela
+            # preta), então o jogo vai para o pendrive do PRÓPRIO PS2 (copiar-ra, mass:/DVD) e abre de lá ("bdm").
+            # preparar-ra faz aqui o "RA: check game support" (ra_preparar.py: hash do ISO + lista do app xeRAbora) e
+            # manda o .wl para mass:/RA/ no pendrive do PS2; copiar-ra prepara antes de copiar o ISO. menu-ra (menu do
+            # OPL-RA) fica para checar à mão.
+            elf = 'host:oplra/OPL-RA-SMB.ELF'
+            if acao == 'api/menu-ra':
+                r = navegador(f'abrir {elf}')
+                return self.json({'ok': r == 'ok', 'msg': 'Abrindo o OPL com conquistas no PS2…' if r == 'ok' else r})
+            st, _, d = remoto('/loja/api/loja')
+            jogo = next((j for j in (json.loads(d).get('jogos', []) if st == 200 else [])
+                         if j.get('id') == corpo.get('id')), None)
+            if not jogo or not jogo.get('instalado'):
+                return self.json({'ok': False, 'msg': 'só jogos instalados no pendrive da TV box'})
+            if acao in ('api/preparar-ra', 'api/copiar-ra'):
+                from ra_preparar import preparar
+                iso = os.path.join(os.path.realpath(os.path.join(PASTA, 'ps2', 'jogos-box')), jogo['arquivo'])
+                try:
+                    _, titulo = preparar(iso, jogo['id'], os.path.join(PASTA, 'ps2', 'ra'))
+                except Exception as e:
+                    return self.json({'ok': False, 'msg': f'Sem conquistas: {e}'})
+                try:
+                    registrar_preparado(jogo['id'], titulo, iso)
+                except Exception:
+                    pass
+                r = navegador(f"copiar2 host:ra/{jogo['id']}.wl|mass:/RA/{jogo['id']}.wl|ra-wl:{jogo['id']}")
+                if r != 'ok':
+                    if acao == 'api/preparar-ra':   # vai para o pendrive do PS2 no "Copiar para o PS2"
+                        return self.json({'ok': True, 'msg': f'🏆 {titulo} — preparado (o PS2 recebe ao copiar o jogo)'})
+                    return self.json({'ok': False, 'msg': r})
+                if acao == 'api/preparar-ra':
+                    return self.json({'ok': True, 'msg': f'🏆 {titulo} — conquistas preparadas no pendrive do PS2'})
+            if acao == 'api/copiar-ra':   # USB 1.1 do PS2: ~1 MB/s; o progresso aparece na tela do navegador
+                if jogo['tamanho'] >= 4 * 1024 ** 3:
+                    return self.json({'ok': False, 'msg': 'maior que 4 GB: não cabe no pendrive FAT32 do PS2'})
+                r = navegador(f"copiar2 host:jogos-box/{jogo['arquivo']}|mass:/DVD/{jogo['arquivo']}|ra:{jogo['id']}")
+                return self.json({'ok': r == 'ok', 'msg': f'Copiando {jogo["nome"]} para o pendrive do PS2 '
+                                  f'(~{jogo["tamanho"] // 1048576 // 60 + 1} min)…' if r == 'ok' else r})
+            args = f"{jogo['arquivo']}|{jogo['id']}|DVD|bdm"
+            if len(args.encode()) > 127:
+                return self.json({'ok': False, 'msg': 'nome do arquivo longo demais para o pedido ao PS2'})
+            r = navegador(f'abrir {elf}|{args}')
+            return self.json({'ok': r == 'ok', 'msg': f'Abrindo {jogo["nome"]} com conquistas…' if r == 'ok' else r})
         # jogos de PS2 (ISO para a TV box de casa) e RetroArch na TV box: só com o notebook na mesma rede
         casa = cfg().get('casa')
         if casa and acao.startswith('api/'):
@@ -191,7 +440,40 @@ class H(BaseHTTPRequestHandler):
         q = urllib.parse.parse_qs(u.query)
         if u.path == '/':
             self.pagina(f'<h1>PS2</h1><div class="lista"><a class="b grande" href="{html.escape(LOJA)}">🛒 Loja</a>'
-                        '<a class="b grande" href="/videos">🎬 Vídeos</a></div>')
+                        '<a class="b grande" href="/videos">🎬 Vídeos</a>'
+                        '<a class="b grande" href="/no-ps2">💾 No pendrive do PS2</a>'
+                        '<a class="b grande" href="/conquistas">🏆 Conquistas</a></div>')
+        elif u.path == '/no-ps2':
+            self.pagina(pagina_no_ps2())
+        elif u.path == '/no-ps2/jogar':
+            arq = os.path.basename((q.get('arquivo') or [''])[0])
+            try:
+                registrados = json.load(open(os.path.join(PASTA, 'ps2', 'no-ps2.json'), encoding='utf-8'))
+            except (OSError, ValueError):
+                registrados = {}
+            if arq not in registrados:
+                return self.pagina(pagina_no_ps2('Esse jogo não está na lista do pendrive do PS2.'))
+            serial = arq[:11] if re.match(r'^[A-Z]{4}_\d{3}\.\d{2}\.', arq) else 'SLUS_000.00'
+            # OPL-RA pelo pendrive do PS2 ("bdm"): com a lista RA/<serial>.wl tem conquistas, sem ela abre normal
+            r = navegador(f'abrir host:oplra/OPL-RA-SMB.ELF|{arq}|{serial}|DVD|bdm')
+            self.pagina(pagina_no_ps2('Abrindo no PS2…' if r == 'ok' else r))
+        elif u.path == '/conquistas':
+            self.pagina(pagina_conquistas())
+        elif u.path.startswith('/conquistas/medalha/') and u.path.endswith('.png'):
+            d = medalha(u.path[len('/conquistas/medalha/'):-4])
+            if d is None:
+                return self.send_error(404)
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/png')
+            self.send_header('Cache-Control', 'max-age=604800')
+            self.send_header('Content-Length', str(len(d)))
+            self.end_headers()
+            self.wfile.write(d)
+        elif u.path == '/conquistas/jogo':
+            try:
+                self.pagina(pagina_jogo_ra(int((q.get('id') or ['0'])[0])))
+            except ValueError:
+                self.send_error(404)
         elif u.path == '/videos':
             itens = ''.join(f'<a class="b" href="/tocar?id={urllib.parse.quote(v["id"])}">{html.escape(v["titulo"])}'
                             f'<div class="p">{v["mb"]} MB · na TV box</div></a>' for v in lista())
@@ -211,4 +493,6 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     print(f'vídeos do PS2 em http://0.0.0.0:{PORTA}/ ({VIDEOS})', flush=True)
+    import threading
+    threading.Thread(target=laco_conquistas, daemon=True).start()   # 🏆 prepara sozinho os ISOs novos
     ThreadingHTTPServer(('0.0.0.0', PORTA), H).serve_forever()

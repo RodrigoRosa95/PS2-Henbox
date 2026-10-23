@@ -35,6 +35,12 @@ def log(*a):
     print(time.strftime('%H:%M:%S'), *a, flush=True)
 
 
+# Conquistas (23/10/2026): ps2/jogos-box é um link para a pasta DVD do pendrive desta box, para o PS2 copiar o ISO
+# para o pendrive dele (o OPL-RA só tem conquistas com o jogo no USB do próprio console). Na prática só leitura: o
+# Android não deixa o Termux gravar no pendrive USB.
+JOGOS_BOX = os.path.join(RAIZ, 'jogos-box')
+
+
 def caminho(nome):
     """host:X → navegador/ps2/X, sem sair da pasta."""
     nome = nome.split(b'\0', 1)[0].decode('latin-1').replace('\\', '/').lstrip('/')
@@ -42,7 +48,9 @@ def caminho(nome):
         nome = nome[5:].lstrip('/')
     final = os.path.realpath(os.path.join(RAIZ, nome))
     if final != RAIZ and not final.startswith(RAIZ + os.sep):
-        raise PermissionError(nome)
+        externo = os.path.realpath(JOGOS_BOX)
+        if not (os.path.islink(JOGOS_BOX) and final.startswith(externo + os.sep)):
+            raise PermissionError(nome)
     return final
 
 
@@ -242,7 +250,14 @@ def pelo_ps2link():
     s.settimeout(20)
     s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     log('PS2Link encontrado: abrindo o navegador por ele')
-    threading.Timer(1.0, execee, args=(PS2, 'host:navegador.elf', 'rede')).start()
+    # versão de teste (23/10/2026): com ps2/NAVEGADOR_TESTE.txt contendo o nome do .elf, o PS2Link abre esse no lugar
+    # do navegador.elf (que continua sendo o que vai para o pendrive na atualização automática)
+    try:
+        teste = open(os.path.join(RAIZ, 'NAVEGADOR_TESTE.txt')).read().strip()
+    except OSError:
+        teste = ''
+    elf = teste if re.fullmatch(r'[\w.-]+\.elf', teste or '') and os.path.exists(os.path.join(RAIZ, teste)) else 'navegador.elf'
+    threading.Timer(1.0, execee, args=(PS2, 'host:' + elf, 'rede')).start()
     try:
         servir(s)   # até o navegador reiniciar o IOP (a conexão cai) e ligar a rede própria dele
     except (ConnectionError, OSError) as e:

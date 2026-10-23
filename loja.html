@@ -268,6 +268,11 @@ function detalhe(arq, manterMsg) {
   let b = '';
   if (j.instalado) {
     b += `<button class="btn verde" data-faz="jogar" ${j.id ? '' : 'disabled'}>▶ Jogar</button>`;
+    // 🏆 RetroAchievements (xeRAbora) pelo navegador do PS2: OPL-RA abre o jogo do pendrive da box pelo Samba
+    // o jogo precisa estar no pendrive do PRÓPRIO PS2 (pelo Samba o xeRAbora ainda não funciona): copiar uma vez
+    if (location.port === '8780' && j.id) b += `<button class="btn verde" data-faz="jogarra">🏆 Jogar com conquistas</button>`
+      + `<button class="btn" data-faz="copiarra" title="O xeRAbora só funciona com o jogo no pendrive do PS2 (USB 1.1: ~1 MB/s)">⬇ Copiar para o PS2</button>`
+      + `<button class="btn" data-faz="prepararra" title="Busca a lista de conquistas no xeRAbora e grava no pendrive do PS2 (o Copiar já faz isso)">🏆 Preparar conquistas</button>`;
     if (!j.so_pendrive) b += `<button class="btn perigo ${armado === arq ? 'armado' : ''}" data-faz="desinstalar">${armado === arq ? '🗑 Confirmar?' : '🗑 Desinstalar'}</button>`;
   } else if (ocupado) {
     b += `<button class="btn" data-faz="cancelar">✕ Cancelar</button>`;
@@ -305,11 +310,11 @@ async function carregar() {
 }
 async function fazer(acao, j) {
   $('dmsg').textContent = 'Enviando…';
-  const url = {jogar: 'api/jogar', snesjogar: 'api/loja/snes/jogar', rainstalar: 'api/loja/snes/retroarch', ratvbox: 'api/loja/snes/tvbox-retroarch',
+  const url = {jogar: 'api/jogar', jogarra: 'api/jogar-ra', menura: 'api/menu-ra', copiarra: 'api/copiar-ra', prepararra: 'api/preparar-ra', snesjogar: 'api/loja/snes/jogar', rainstalar: 'api/loja/snes/retroarch', ratvbox: 'api/loja/snes/tvbox-retroarch',
                raatualizar: 'api/loja/snes/atualizar-retroarch'}[acao] || 'api/loja/' + acao;
   if (acao === 'raatualizar') $('dmsg').textContent = 'Baixando do site oficial do libretro…';
   if (acao === 'ratvbox') $('dmsg').textContent = 'Copiando para o pendrive da TV box…';
-  const corpo = acao === 'jogar' ? {id: j.id} : {arquivo: (acao === 'snes' || acao === 'snesjogar') ? j.rom : j.arquivo};
+  const corpo = (acao === 'jogar' || acao === 'jogarra' || acao === 'menura' || acao === 'copiarra' || acao === 'prepararra') ? {id: j.id} : {arquivo: (acao === 'snes' || acao === 'snesjogar') ? j.rom : j.arquivo};
   try {
     const r = await (await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo)})).json();
     $('dmsg').textContent = (r.ok ? '✔ ' : '⚠ ') + r.msg;

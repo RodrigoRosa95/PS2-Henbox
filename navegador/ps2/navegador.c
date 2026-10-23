@@ -28,6 +28,8 @@
  *     op 3 = apagar origem do pendrive; a cópia (op 0) roda numa thread própria (a tela não para)
  *   entrada.bin bytes 91..95: vídeo ativo:u8 posição_ms:u32   (estado 8 tocando, 9 acabou, 10 parado)
  *   host:clique.raw / host:musica.raw   sons PCM 16 bits mono 22050 Hz (gerados no notebook)
+ *   host:aviso.raw   frase falada (ex.: "Sua cópia foi concluída."), tocada uma vez quando o contador nos bits 16-23
+ *                    do cmd do dif.bin muda (23/10/2026)
  *   host:temperatura.txt   escrito pelo PS2 a cada 10 s: °C do sensor do Mechacon ("41.5"), ver temperatura.py
  * Controle: o com fio (porta 1) e o DualShock 4/3 por Bluetooth no adaptador USB, com o mesmo driver e o mesmo
  * pareamento do OPL (o DS4 guarda o endereço do adaptador; no OPL: $EnablePadEmu=1, $PadEmuSettings=257).
@@ -55,6 +57,7 @@
 #include <sbv_patches.h>
 #include <fcntl.h>
 extern void fioExit(void);   /* (fileio.h não pode ser incluído no newlib) religa o fio depois de reiniciar o IOP */
+extern int fioFormat(const char *name);   /* formatar o pendrive (op 4): só com o bdmfs_fatfs do PS2 Henbox */
 #include <unistd.h>
 #include <libpad.h>
 #include <gsKit.h>
@@ -105,6 +108,9 @@ static unsigned char pedido_estado = 0, pedido_pct = 0, usb_carregado = 0;
 static short *musica = NULL, *clique = NULL;
 static int musica_n = 0, clique_n = 0, musica_pos = 0;
 static volatile int musica_ligada = 0, clique_pos = -1;
+static short *aviso = NULL;                 /* frase falada (host:aviso.raw), uma vez por mudança do contador */
+static int aviso_n = 0, aviso_visto = -1;
+static volatile int aviso_pos = -1;
 /* modo vídeo (video.inc.c): pedido pelo notebook com op 2 em pedido.bin */
 static volatile int som_pausado = 0;
 /* Saída (Jogar/sair): as threads de som, rede e cópia param num ponto seguro antes do audsrv_quit e do
@@ -142,6 +148,7 @@ static void thread_som(void *arg)
             int v = 0;
             if (musica_ligada && musica_n) { v += musica[musica_pos] / 2; if (++musica_pos >= musica_n) musica_pos = 0; }
             if (clique_pos >= 0 && clique) { v += clique[clique_pos]; if (++clique_pos >= clique_n) clique_pos = -1; }
+            if (aviso_pos >= 0 && aviso) { v += aviso[aviso_pos]; if (++aviso_pos >= aviso_n) aviso_pos = -1; }
             bloco[i] = v > 32767 ? 32767 : (v < -32768 ? -32768 : v);
         }
         audsrv_wait_audio(sizeof(bloco));
@@ -217,6 +224,17 @@ static int atualizar_tela(void)
     if ((cmd & 0xFF) == 1) return 1;
     if ((cmd & 0x100) && !musica && (musica = carregar_som("host:musica.raw", &musica_n)) == NULL) musica_n = 0;
     musica_ligada = (cmd & 0x100) != 0;
+    {   /* aviso falado: o contador (bits 16-23) mudou → toca host:aviso.raw. A 1ª leitura só guarda o valor */
+        int s = (cmd >> 16) & 0xFF;
+        if (aviso_visto < 0) aviso_visto = s;
+        else if (s != aviso_visto) {
+            aviso_visto = s;
+            aviso_pos = -1;
+            DelayThread(20000);   /* a thread de som termina o bloco antes de soltar o buffer antigo */
+            if (aviso) { free(aviso); aviso = NULL; }
+            if ((aviso = carregar_som("host:aviso.raw", &aviso_n)) != NULL) aviso_pos = 0;
+        }
+    }
     if (cmd & 0x200) pedido_pendente = 1;
     if (seq == minha_seq) return pedido_pendente ? (pedido_pendente = 0, 2) : 0;
     if (base == minha_seq && base != 0 && aplicar(tam) == 0) { minha_seq = seq; return pedido_pendente ? (pedido_pendente = 0, 2) : 0; }
@@ -333,6 +351,14 @@ static void copiar_pedido(void)
         return;
     }
     if (!carregar_usb()) { pedido_estado = 3; pedido_feito = id; return; }
+#ifdef HENBOX_FORMATAR
+    if (op == 4) {   /* formatar o pendrive (PS2 Henbox, teste 23/10/2026): origem "mass0:" = FAT32, "mass0:exfat" = exFAT.
+                        Precisa do bdmfs_fatfs próprio (operação format do iomanX); demora alguns segundos */
+        pedido_estado = fioFormat(origem) >= 0 ? 2 : 4;
+        pedido_pct = 100; pedido_feito = id;
+        return;
+    }
+#endif
     if (op == 1) {   /* executar do pendrive: confere que existe, avisa o notebook e sai para ele */
         if ((in = open(origem, O_RDONLY)) < 0) { pedido_estado = 4; pedido_feito = id; return; }
         close(in);

@@ -408,6 +408,7 @@ class Sessao:
     # ---- ligação com o PS2 (arquivos no host:) ----
     def cmd_atual(self):
         cmd = 0   # música da loja desligada (pedido do usuário 17/10/2026: pesava o cursor); era MUSICA na loja.html
+        cmd |= (getattr(self, 'aviso_seq', 0) & 0xFF) << 16   # mudou = o navegador fala ps2/aviso.raw uma vez
         if self.pedido and self.pedido.get('estado') in (None, 'copiando'):
             cmd |= PEDIDO
         return cmd
@@ -463,6 +464,41 @@ class Sessao:
             time.sleep(0.33)
         if self.aberto():
             self.enviar_tela()
+
+    # ---- aviso falado no PS2 (23/10/2026) ----
+    def falar(self, som, texto):
+        """Copia ps2/sons/<som>.raw (PCM 16 bits mono 22050 Hz, voz Piper pt-BR) para ps2/aviso.raw, soma o contador
+        e mostra a faixa: a tela muda, o dif.bin leva o contador novo e o navegador toca a frase uma vez."""
+        origem = os.path.join(PASTA_PS2, 'sons', som + '.raw')
+        if not os.path.exists(origem):
+            return
+        with open(origem, 'rb') as f:
+            gravar(os.path.join(PASTA_PS2, 'aviso.raw'), f.read())
+        self.aviso_seq = (getattr(self, 'aviso_seq', 0) + 1) & 0xFF
+        self.avisar(texto, girando=False, cor=(63, 185, 80), segundos=6)
+
+    # ---- 🏆 conquistas (23/10/2026): listas preparadas na box (ps2/ra/*.wl) vão sozinhas para o pendrive do PS2 ----
+    def sincronizar_ra(self):
+        """Ao conectar: cada <serial>.wl novo ou alterado (videos.py prepara sozinho os ISOs desta box) é copiado
+        para mass:/RA/, onde o OPL-RA procura primeiro. Lembra o que já foi (ps2/ra/sincronizado.json), por md5."""
+        pasta = os.path.join(PASTA_PS2, 'ra')
+        estado_arq = os.path.join(pasta, 'sincronizado.json')
+        try:
+            feito = json.load(open(estado_arq))
+        except (OSError, ValueError):
+            feito = {}
+        for nome in sorted(os.listdir(pasta)) if os.path.isdir(pasta) else []:
+            if not nome.endswith('.wl'):
+                continue
+            md5 = nuvem.sha256_arquivo(os.path.join(pasta, nome))
+            if feito.get(nome) == md5:
+                continue
+
+            def marcar(est, nome=nome, md5=md5):
+                if est == 2:
+                    feito[nome] = md5
+                    gravar(estado_arq, json.dumps(feito).encode())
+            self.enfileirar(0, f'host:ra/{nome}', f'mass:/RA/{nome}', 'ra-wl:' + nome, 'copiando', depois=marcar)
 
     # ---- atualização do navegador.elf do pendrive (22/10/2026) ----
     def verificar_pendrive(self, tentativa=0):
@@ -643,6 +679,7 @@ class Sessao:
                 self.n_teclas = None
                 self.ra_copiado = False   # pode ser outro pendrive
                 threading.Timer(4, self.verificar_pendrive).start()
+                threading.Timer(10, self.sincronizar_ra).start()   # 🏆 listas de conquistas novas → pendrive do PS2
                 threading.Thread(target=self.enviar_tela, args=(True,), daemon=True).start()
             self.ult_entrada = time.time()
             botoes, cx, cy, rx, ry, seq, n_teclas, roda = struct.unpack('<HHHbbIHb', d[4:19])
@@ -682,6 +719,13 @@ class Sessao:
                                                             or (p['op'] == 1 and not falhou)}
                         if falhou:   # não adianta seguir (ex.: sem pendrive)
                             self.fila = [x for x in self.fila if x['arquivo'] != p['arquivo']]
+                        alvo = (p['origem'] if p['op'] == 3 else p['destino']).decode(errors='ignore')
+                        if est == 2 and p['op'] in (0, 3) and alvo.startswith('mass:/DVD/'):
+                            registrar_jogo_ps2(alvo[len('mass:/DVD/'):], p['op'] == 0)
+                            if p['op'] == 0:   # "Sua cópia foi concluída." na TV
+                                nome = os.path.splitext(alvo[len('mass:/DVD/'):])[0]
+                                nome = nome[12:] if len(nome) > 12 and nome[4] == '_' and nome[11] == '.' else nome
+                                self.falar('copia-concluida', '✔ Cópia concluída: ' + nome)
                         if p.get('depois'):   # continuação (atualização do pendrive)
                             threading.Thread(target=p['depois'], args=(est,), daemon=True).start()
                         self.proximo_pedido()
@@ -748,6 +792,21 @@ def cabecalho(seq, base, cmd, regs):
     return b'PST2' + struct.pack('<IIII', seq, base, cmd, sum(map(len, regs)))
 
 
+def registrar_jogo_ps2(arquivo, presente):
+    """💾 Jogos no pendrive do PS2 (23/10/2026): o navegador não lista pastas do pendrive, então a box anota os ISOs
+    que ela copiou para mass:/DVD/ (e tira os apagados) em ps2/no-ps2.json; o videos.py mostra a lista."""
+    arq = os.path.join(PASTA_PS2, 'no-ps2.json')
+    try:
+        jogos = json.load(open(arq, encoding='utf-8'))
+    except (OSError, ValueError):
+        jogos = {}
+    if presente:
+        jogos[arquivo] = {'quando': time.strftime('%d/%m/%Y %H:%M')}
+    else:
+        jogos.pop(arquivo, None)
+    gravar(arq, json.dumps(jogos, ensure_ascii=False, indent=1).encode())
+
+
 def gravar(caminho, dados):
     tmp = caminho + '.tmp'
     with open(tmp, 'wb') as f:
@@ -796,6 +855,22 @@ def controle_um(sessao, c):
             c.sendall(b'ok\n')
     elif pedido.startswith('video '):
         c.sendall((sessao.video(pedido[6:].strip()) + '\n').encode())
+    elif pedido.startswith('falar '):   # teste do aviso falado: "falar copia-concluida"
+        som = os.path.basename(pedido[6:].strip())
+        if not sessao.aberto():
+            c.sendall(b'o navegador nao esta aberto no PS2\n')
+        else:
+            sessao.falar(som, '🔊 teste do aviso falado')
+            c.sendall(b'ok\n')
+    elif pedido.startswith('formatar '):   # PS2 Henbox (teste 23/10/2026): só o navegador-formatar.elf entende (op 4)
+        tipo = pedido[9:].strip().lower()
+        if tipo not in ('fat32', 'exfat'):
+            c.sendall(b'tipo deve ser fat32 ou exfat\n')
+        elif not sessao.aberto():
+            c.sendall(b'o navegador nao esta aberto no PS2\n')
+        else:
+            sessao.enfileirar(4, 'mass0:exfat' if tipo == 'exfat' else 'mass0:', '-', '__formatar__', 'formatando')
+            c.sendall(b'ok\n')
     elif pedido.startswith('neutrino '):
         c.sendall((sessao.neutrino(pedido[9:].strip()) + '\n').encode())
     elif pedido.startswith('abrir '):   # abrir <ELF>[|args]: o navegador fecha e o PS2 roda o ELF (18/10/2026)

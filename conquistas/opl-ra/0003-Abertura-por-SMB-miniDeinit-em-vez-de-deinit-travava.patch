@@ -1,0 +1,33 @@
+From 3c0192751b6447b870f66b09c6eb6b837dc7181a Mon Sep 17 00:00:00 2001
+From: Rodrigo Rosa dos Passos <digorpassos16245@gmail.com>
+Date: Fri, 23 Oct 2026 09:11:40 -0300
+Subject: [PATCH 3/3] Abertura por SMB: miniDeinit em vez de deinit (travava
+ com tela preta)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/ethsupport.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/ethsupport.c b/src/ethsupport.c
+index e30adec..b709094 100644
+--- a/src/ethsupport.c
++++ b/src/ethsupport.c
+@@ -693,7 +693,13 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
+ 
+     if (configGetStrCopy(configSet, CONFIG_ITEM_ALTSTARTUP, filename, sizeof(filename)) == 0)
+         strcpy(filename, game->startup);
+-    deinit(NO_EXCEPTION, ETH_MODE); // CAREFUL: deinit will call ethCleanUp, so ethGames/game will be freed
++    if (gAutoLaunchSMB) {
++        /* no GUI to tear down (deinit hung here, black screen): what ethCleanUp does, then miniDeinit like BDM/HDD */
++        ethSMBDisconnect();
++        ethDeinitModules(); // keeps the network settings (lastIP) for the in-game side
++        miniDeinit(configSet);
++    } else
++        deinit(NO_EXCEPTION, ETH_MODE); // CAREFUL: deinit will call ethCleanUp, so ethGames/game will be freed
+ 
+     settings->common.fakemodule_flags |= FAKE_MODULE_FLAG_DEV9;
+     settings->common.fakemodule_flags |= FAKE_MODULE_FLAG_SMAP;
+-- 
+2.43.0
+

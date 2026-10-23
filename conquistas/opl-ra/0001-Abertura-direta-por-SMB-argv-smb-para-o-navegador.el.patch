@@ -1,0 +1,249 @@
+From 23ed10d670dbcbfc89696efe980965d6cb549a43 Mon Sep 17 00:00:00 2001
+From: Rodrigo Rosa dos Passos <digorpassos16245@gmail.com>
+Date: Fri, 23 Oct 2026 08:31:16 -0300
+Subject: [PATCH 1/3] Abertura direta por SMB (argv "smb") para o navegador.elf
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ include/ethsupport.h |   2 +
+ src/ethsupport.c     |  35 +++++++++++++-
+ src/opl.c            | 111 ++++++++++++++++++++++++++++++++-----------
+ 3 files changed, 120 insertions(+), 28 deletions(-)
+
+diff --git a/include/ethsupport.h b/include/ethsupport.h
+index 4db7fc0..ac36e52 100644
+--- a/include/ethsupport.h
++++ b/include/ethsupport.h
+@@ -25,5 +25,7 @@ int ethGetDHCPStatus(void);
+ int ethGetNetIFLinkStatus(void); // RA: is the cable in and the link up
+ 
+ item_list_t *ethGetObject(int initOnly);
++#include "include/supportbase.h"
++void ethAutoLaunchGame(base_game_info_t *game); /* SMB auto launch from argv (opl.c) */
+ 
+ #endif
+diff --git a/src/ethsupport.c b/src/ethsupport.c
+index 7decb58..e30adec 100644
+--- a/src/ethsupport.c
++++ b/src/ethsupport.c
+@@ -25,6 +25,7 @@ static time_t ethModifiedCDPrev;
+ static time_t ethModifiedDVDPrev;
+ static int ethGameCount = 0;
+ static unsigned char ethModulesLoaded = 0;
++static int gAutoLaunchSMB = 0; // auto launch from argv: no GUI to ask questions
+ static base_game_info_t *ethGames = NULL;
+ 
+ static struct ip4_addr lastIP;
+@@ -612,7 +613,7 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
+             } else {
+                 char error[256];
+                 snprintf(error, sizeof(error), _l(_STR_ERR_VMC_CONTINUE), vmc_name, (vmc_id + 1));
+-                if (!guiMsgBox(error, 1, NULL))
++                if (!gAutoLaunchSMB && !guiMsgBox(error, 1, NULL))
+                     return;
+             }
+         }
+@@ -703,6 +704,38 @@ static void ethLaunchGame(item_list_t *itemList, int id, config_set_t *configSet
+     sysLaunchLoaderElf(filename, "ETH_MODE", size_smb_cdvdman_irx, smb_cdvdman_irx, size_mcemu_irx, smb_mcemu_irx, EnablePS2Logo, compatmask);
+ }
+ 
++/* SMB auto launch (opl.c autoLaunchSMBGame): network up, share open, then the same ethLaunchGame as the menu.
++   Takes ownership of game. Returns only on failure. */
++void ethAutoLaunchGame(base_game_info_t *game)
++{
++    gAutoLaunchSMB = 1;
++    if (ethInitSema() < 0)
++        return;
++    ethBase = "smb0:";
++    gNetworkStartup = ERROR_ETH_NOT_STARTED;
++
++    WaitSema(ethInitSemaID);
++    int ret = ethLoadModules();
++    SignalSema(ethInitSemaID);
++    if (ret != 0 || sysLoadModuleBuffer(&smbman_irx, size_smbman_irx, 0, NULL) < 0)
++        return;
++    sysLoadModuleBuffer(&nbns_irx, size_nbns_irx, 0, NULL);
++    nbnsInit();
++
++    WaitSema(ethInitSemaID);
++    ret = ethInitApplyConfig();
++    SignalSema(ethInitSemaID);
++    if (ret != 0)
++        return;
++    ethSMBConnect();
++    if (gNetworkStartup != 0 || !gPCShareName[0])
++        return;
++
++    ethGames = game;
++    ethGameCount = 1;
++    ethLaunchGame(&ethGameList, 0, sbPopulateConfig(game, ethPrefix, "\\"));
++}
++
+ static config_set_t *ethGetConfig(item_list_t *itemList, int id)
+ {
+     return sbPopulateConfig(&ethGames[id], ethPrefix, "\\");
+diff --git a/src/opl.c b/src/opl.c
+index f1ddcef..e84d86a 100644
+--- a/src/opl.c
++++ b/src/opl.c
+@@ -917,6 +917,8 @@ static int tryAlternateDevice(int types)
+     return 0;
+ }
+ 
++static void loadNetworkConfig(config_set_t *configNet);
++
+ static void _loadConfig()
+ {
+     int value, themeID = -1, langID = -1;
+@@ -1011,42 +1013,47 @@ static void _loadConfig()
+             result = tryAlternateDevice(lscstatus);
+         }
+ 
+-        if (result & CONFIG_NETWORK) {
+-            config_set_t *configNet = configGetByType(CONFIG_NETWORK);
++        if (result & CONFIG_NETWORK)
++            loadNetworkConfig(configGetByType(CONFIG_NETWORK));
++    }
+ 
+-            configGetInt(configNet, CONFIG_NET_ETH_LINKM, &gETHOpMode);
++    applyConfig(themeID, langID, 0);
+ 
+-            configGetInt(configNet, CONFIG_NET_PS2_DHCP, &ps2_ip_use_dhcp);
+-            configGetInt(configNet, CONFIG_NET_SMB_NBNS, &gPCShareAddressIsNetBIOS);
+-            configGetStrCopy(configNet, CONFIG_NET_SMB_NB_ADDR, gPCShareNBAddress, sizeof(gPCShareNBAddress));
++    lscret = result;
++    lscstatus = 0;
++    showCfgPopup = 1;
++}
+ 
+-            if (configGetStr(configNet, CONFIG_NET_SMB_IP_ADDR, &temp))
+-                sscanf(temp, "%d.%d.%d.%d", &pc_ip[0], &pc_ip[1], &pc_ip[2], &pc_ip[3]);
++/* Network and SMB share settings from conf_network.cfg; shared by the menu and the SMB auto launch. */
++static void loadNetworkConfig(config_set_t *configNet)
++{
++    const char *temp;
+ 
+-            configGetInt(configNet, CONFIG_NET_SMB_PORT, &gPCPort);
++    configGetInt(configNet, CONFIG_NET_ETH_LINKM, &gETHOpMode);
+ 
+-            configGetStrCopy(configNet, CONFIG_NET_SMB_SHARE, gPCShareName, sizeof(gPCShareName));
+-            configGetStrCopy(configNet, CONFIG_NET_SMB_USER, gPCUserName, sizeof(gPCUserName));
+-            configGetStrCopy(configNet, CONFIG_NET_SMB_PASSW, gPCPassword, sizeof(gPCPassword));
++    configGetInt(configNet, CONFIG_NET_PS2_DHCP, &ps2_ip_use_dhcp);
++    configGetInt(configNet, CONFIG_NET_SMB_NBNS, &gPCShareAddressIsNetBIOS);
++    configGetStrCopy(configNet, CONFIG_NET_SMB_NB_ADDR, gPCShareNBAddress, sizeof(gPCShareNBAddress));
+ 
+-            if (configGetStr(configNet, CONFIG_NET_PS2_IP, &temp))
+-                sscanf(temp, "%d.%d.%d.%d", &ps2_ip[0], &ps2_ip[1], &ps2_ip[2], &ps2_ip[3]);
+-            if (configGetStr(configNet, CONFIG_NET_PS2_NETM, &temp))
+-                sscanf(temp, "%d.%d.%d.%d", &ps2_netmask[0], &ps2_netmask[1], &ps2_netmask[2], &ps2_netmask[3]);
+-            if (configGetStr(configNet, CONFIG_NET_PS2_GATEW, &temp))
+-                sscanf(temp, "%d.%d.%d.%d", &ps2_gateway[0], &ps2_gateway[1], &ps2_gateway[2], &ps2_gateway[3]);
+-            if (configGetStr(configNet, CONFIG_NET_PS2_DNS, &temp))
+-                sscanf(temp, "%d.%d.%d.%d", &ps2_dns[0], &ps2_dns[1], &ps2_dns[2], &ps2_dns[3]);
++    if (configGetStr(configNet, CONFIG_NET_SMB_IP_ADDR, &temp))
++        sscanf(temp, "%d.%d.%d.%d", &pc_ip[0], &pc_ip[1], &pc_ip[2], &pc_ip[3]);
+ 
+-            configGetStrCopy(configNet, CONFIG_NET_NBD_DEFAULT_EXPORT, gExportName, sizeof(gExportName));
+-        }
+-    }
++    configGetInt(configNet, CONFIG_NET_SMB_PORT, &gPCPort);
+ 
+-    applyConfig(themeID, langID, 0);
++    configGetStrCopy(configNet, CONFIG_NET_SMB_SHARE, gPCShareName, sizeof(gPCShareName));
++    configGetStrCopy(configNet, CONFIG_NET_SMB_USER, gPCUserName, sizeof(gPCUserName));
++    configGetStrCopy(configNet, CONFIG_NET_SMB_PASSW, gPCPassword, sizeof(gPCPassword));
+ 
+-    lscret = result;
+-    lscstatus = 0;
+-    showCfgPopup = 1;
++    if (configGetStr(configNet, CONFIG_NET_PS2_IP, &temp))
++        sscanf(temp, "%d.%d.%d.%d", &ps2_ip[0], &ps2_ip[1], &ps2_ip[2], &ps2_ip[3]);
++    if (configGetStr(configNet, CONFIG_NET_PS2_NETM, &temp))
++        sscanf(temp, "%d.%d.%d.%d", &ps2_netmask[0], &ps2_netmask[1], &ps2_netmask[2], &ps2_netmask[3]);
++    if (configGetStr(configNet, CONFIG_NET_PS2_GATEW, &temp))
++        sscanf(temp, "%d.%d.%d.%d", &ps2_gateway[0], &ps2_gateway[1], &ps2_gateway[2], &ps2_gateway[3]);
++    if (configGetStr(configNet, CONFIG_NET_PS2_DNS, &temp))
++        sscanf(temp, "%d.%d.%d.%d", &ps2_dns[0], &ps2_dns[1], &ps2_dns[2], &ps2_dns[3]);
++
++    configGetStrCopy(configNet, CONFIG_NET_NBD_DEFAULT_EXPORT, gExportName, sizeof(gExportName));
+ }
+ 
+ static int trySaveConfigBDM(int types)
+@@ -1966,9 +1973,15 @@ static void miniInit(int mode)
+                 configGetInt(configOPL, CONFIG_OPL_HDD_CACHE, &hddCacheSize);
+             } else if (mode == MMCE_MODE) {
+                 configGetStrCopy(configOPL, CONFIG_OPL_MMCE_PREFIX, gMMCEPrefix, sizeof(gMMCEPrefix));
++            } else if (mode == ETH_MODE) {
++                configGetStrCopy(configOPL, CONFIG_OPL_ETH_PREFIX, gETHPrefix, sizeof(gETHPrefix));
++                configGetInt(configOPL, CONFIG_OPL_SMB_CACHE, &smbCacheSize);
+             }
+         }
+     }
++
++    if (mode == ETH_MODE && (ret & CONFIG_NETWORK))
++        loadNetworkConfig(configGetByType(CONFIG_NETWORK));
+ }
+ 
+ void miniDeinit(config_set_t *configSet)
+@@ -2089,6 +2102,43 @@ static void autoLaunchBDMGame(char *argv[])
+     bdmLaunchGame(NULL, -1, configSet);
+ }
+ 
++/* SMB auto launch (navegador.elf, 23/10/2026): like the "bdm" mode, but for a game on the network share
++   configured in conf_network.cfg, so the RA watch list and telemetry work exactly as from the menu.
++   argv[1] file name (including extension)  argv[2] game->startup  argv[3] "CD"/"DVD"  argv[4] "smb"
++   Only returns if the share could not be reached; then OPL exits to the configured exit path. */
++static void autoLaunchSMBGame(char *argv[])
++{
++    base_game_info_t *game;
++    int nameLen;
++
++    miniInit(ETH_MODE);
++
++    if ((game = malloc(sizeof(base_game_info_t))) == NULL)
++        sysExecExit();
++    memset(game, 0, sizeof(base_game_info_t));
++
++    int format = isValidIsoName(argv[1], &nameLen);
++    if (format == GAME_FORMAT_OLD_ISO) {
++        strncpy(game->name, &argv[1][GAME_STARTUP_MAX], nameLen);
++        game->name[nameLen] = '\0';
++        strncpy(game->extension, &argv[1][GAME_STARTUP_MAX + nameLen], sizeof(game->extension));
++    } else {
++        strncpy(game->name, argv[1], nameLen);
++        game->name[nameLen] = '\0';
++        strncpy(game->extension, &argv[1][nameLen], sizeof(game->extension));
++    }
++    game->extension[sizeof(game->extension) - 1] = '\0';
++    snprintf(game->startup, sizeof(game->startup), "%s", argv[2]);
++    game->media = strcasecmp("CD", argv[3]) == 0 ? SCECdPS2CD : SCECdPS2DVD;
++    game->format = format;
++    game->parts = 1;
++
++    ethAutoLaunchGame(game); // does not return on success
++
++    LOG("SMB auto launch failed (network status %d)\n", gNetworkStartup);
++    sysExecExit();
++}
++
+ // --------------------- Main --------------------
+ int main(int argc, char *argv[])
+ {
+@@ -2120,6 +2170,13 @@ int main(int argc, char *argv[])
+            argv[4] "bdm" */
+         if (!strcmp(argv[4], "bdm"))
+             autoLaunchBDMGame(argv);
++        /* argv[0] boot path
++           argv[1] file name (including extention)
++           argv[2] game->startup
++           argv[3] game->media ("CD" / "DVD")
++           argv[4] "smb" */
++        if (!strcmp(argv[4], "smb"))
++            autoLaunchSMBGame(argv);
+     }
+ 
+     init();
+-- 
+2.43.0
+
