@@ -191,6 +191,47 @@ def varrer_conquistas():
             salvar_indice(ind)
 
 
+DESBLOQUEIOS = os.path.join(PASTA, 'ps2', 'ra', 'desbloqueios.json')   # histórico: Xoom e navegador avisam
+
+
+def ler_desbloqueios():
+    try:
+        return json.load(open(DESBLOQUEIOS, encoding='utf-8'))
+    except (OSError, ValueError):
+        return []
+
+
+def vigiar_desbloqueios():
+    """A cada 3 s: desbloqueio novo no xeRAbora (/state.unlocks, os 16 últimos da sessão) entra no histórico com a
+    descrição e o jogo. O assistente do Xoom (pop-up com som) e o navegador (resumo ao voltar) leem daqui."""
+    while True:
+        try:
+            st = xera('/state') or {}
+            novos = [u for u in (st.get('unlocks') or []) if u.get('id')]
+            if novos:
+                hist = ler_desbloqueios()
+                vistos = {d['id'] for d in hist}
+                g = st.get('game') or {}
+                desc = {a.get('id'): a.get('description') for a in (g.get('achievements') or [])}
+                mudou = False
+                for u in reversed(novos):   # do mais antigo ao mais novo
+                    if u['id'] in vistos:
+                        continue
+                    hist.append({'id': u['id'], 'titulo': u.get('title'), 'medalha': str(u.get('badge') or ''),
+                                 'pontos': u.get('points', 0), 'descricao': desc.get(u['id']) or '',
+                                 'jogo': g.get('title') or '', 'quando': time.time() - (u.get('ago') or 0),
+                                 'navegador': False})
+                    mudou = True
+                if mudou:
+                    hist = hist[-300:]
+                    with open(DESBLOQUEIOS + '.tmp', 'w', encoding='utf-8') as f:
+                        json.dump(hist, f, ensure_ascii=False, indent=1)
+                    os.replace(DESBLOQUEIOS + '.tmp', DESBLOQUEIOS)
+        except Exception as e:
+            print('vigia de desbloqueios:', e, flush=True)
+        time.sleep(3)
+
+
 def laco_conquistas():
     time.sleep(60)
     while True:
@@ -229,6 +270,12 @@ def pagina_no_ps2(msg=''):
     return '<h1>💾 No pendrive do PS2</h1>' + aviso + '<div class="lista"><a class="b" href="/">← Voltar</a>' + itens + '</div>'
 
 
+def ao_vivo():
+    """Com um jogo transmitindo para o xeRAbora, as páginas 🏆 se recarregam sozinhas (acompanhar pela TV)."""
+    c = ((xera('/state') or {}).get('console') or {})
+    return '<meta http-equiv="refresh" content="15">' if c.get('connected') and c.get('frames') else ''
+
+
 def pagina_conquistas():
     perfil, st = xera('/profile'), xera('/state')
     if perfil is None or st is None:
@@ -237,10 +284,11 @@ def pagina_conquistas():
     topo = (f'<div class="topo">👤 {html.escape(perfil.get("user") or "?")} · <b>{perfil.get("points", 0)} pontos</b>'
             + (f' · {html.escape(perfil["presence"])}' if perfil.get('presence') else '') + '</div>')
     itens, vistos = '', set()
-    for u in (st.get('unlocks') or [])[-5:][::-1]:   # desbloqueadas agora, na sessão
-        itens += (f'<div class="c ganha"><img src="{BADGE}{html.escape(str(u.get("badge", "")))}.png">'
-                  f'<div><div class="t">🏆 {html.escape(u.get("title") or "")}</div>'
-                  f'<div class="d">{html.escape(u.get("description") or "")}</div></div></div>')
+    for u in ler_desbloqueios()[-5:][::-1]:   # desbloqueadas recentemente (histórico do vigia)
+        quando = time.strftime('%d/%m %H:%M', time.localtime(u.get('quando') or 0))
+        itens += (f'<div class="c ganha"><img src="{BADGE}{html.escape(u.get("medalha", ""))}.png">'
+                  f'<div><div class="t">🏆 {html.escape(u.get("titulo") or "")} · {u.get("pontos", 0)} pts</div>'
+                  f'<div class="d">{html.escape(u.get("jogo") or "")} · {quando}</div></div></div>')
     jogos = []
     g = st.get('game') or {}
     if g.get('id'):
@@ -264,7 +312,7 @@ def pagina_conquistas():
                   f'<div class="p">{info} · {html.escape(onde)}</div><div class="barra"><i style="width:{pct}%"></i></div></a>')
     if not jogos:
         itens += '<div class="msg">Nenhum jogo ainda. Na Loja, use 🏆 Preparar conquistas num jogo.</div>'
-    return ('<h1>🏆 Conquistas</h1>' + ESTILO_RA + topo + '<div class="lista"><a class="b" href="/">← Voltar</a>'
+    return (ao_vivo() + '<h1>🏆 Conquistas</h1>' + ESTILO_RA + topo + '<div class="lista"><a class="b" href="/">← Voltar</a>'
             + itens + '</div>')
 
 
@@ -282,7 +330,7 @@ def pagina_jogo_ra(jid):
                   f'<div class="t">{html.escape(a.get("title") or "")} · {a.get("points", 0)} pts</div>'
                   f'<div class="d">{html.escape(a.get("description") or "")}{quando}</div></div></div>')
     topo = f'<div class="topo"><b>{g.get("awarded", 0)} de {g.get("total", len(conq))}</b> desbloqueadas</div>'
-    return (f'<h1>{html.escape(g.get("title") or "🏆")}</h1>' + ESTILO_RA + topo
+    return (ao_vivo() + f'<h1>{html.escape(g.get("title") or "🏆")}</h1>' + ESTILO_RA + topo
             + '<div class="lista"><a class="b" href="/conquistas">← Voltar</a>' + itens + '</div>')
 
 
@@ -469,6 +517,15 @@ class H(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(d)))
             self.end_headers()
             self.wfile.write(d)
+        elif u.path == '/henbox':   # identificação para o app do celular achar esta TV box sozinho na rede
+            return self.json({'app': 'ps2-henbox', 'conquistas': True})
+        elif u.path == '/conquistas/api/desbloqueios':   # ?desde=<epoch>: o assistente do Xoom faz o pop-up
+            try:
+                desde = float((q.get('desde') or ['0'])[0])
+            except ValueError:
+                desde = 0
+            return self.json([{k: v for k, v in d.items() if k != 'navegador'}
+                              for d in ler_desbloqueios() if (d.get('quando') or 0) > desde])
         elif u.path == '/conquistas/jogo':
             try:
                 self.pagina(pagina_jogo_ra(int((q.get('id') or ['0'])[0])))
@@ -495,4 +552,5 @@ if __name__ == '__main__':
     print(f'vídeos do PS2 em http://0.0.0.0:{PORTA}/ ({VIDEOS})', flush=True)
     import threading
     threading.Thread(target=laco_conquistas, daemon=True).start()   # 🏆 prepara sozinho os ISOs novos
+    threading.Thread(target=vigiar_desbloqueios, daemon=True).start()   # 🏆 histórico de desbloqueios
     ThreadingHTTPServer(('0.0.0.0', PORTA), H).serve_forever()

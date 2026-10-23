@@ -34,7 +34,9 @@ Com o app [xeRAbora](https://github.com/hacan359/xerabora) na TV box, os jogos g
 RetroAchievements no PS2 de verdade** — e o Henbox prepara tudo sozinho: a TV box calcula o hash dos ISOs, busca a
 lista de conquistas e manda para o pendrive do PS2, sem abrir o menu do OPL. No navegador: **⬇ Copiar para o PS2**,
 **▶ Jogar** e a página **🏆 Conquistas** com o progresso e as medalhas. Testado no PS2 real com o Black (60 leituras
-por segundo, 56 conquistas acompanhadas). Detalhes em [Conquistas](docs/conquistas.md).
+por segundo, 56 conquistas acompanhadas). No celular, o app [PS2 Conquistas](app-conquistas/)
+([APK](downloads/PS2Conquistas.apk)) acha a TV box sozinho e avisa cada desbloqueio com a medalha e um plim de troféu.
+Detalhes em [Conquistas](docs/conquistas.md).
 
 ## Telas (como aparecem no PS2, 640x448)
 

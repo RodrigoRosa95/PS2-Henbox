@@ -408,7 +408,7 @@ class Sessao:
     # ---- ligação com o PS2 (arquivos no host:) ----
     def cmd_atual(self):
         cmd = 0   # música da loja desligada (pedido do usuário 17/10/2026: pesava o cursor); era MUSICA na loja.html
-        cmd |= (getattr(self, 'aviso_seq', 0) & 0xFF) << 16   # mudou = o navegador fala ps2/aviso.raw uma vez
+        cmd |= (self.ler_aviso_seq() & 0xFF) << 16   # mudou = o navegador fala ps2/aviso.raw uma vez
         if self.pedido and self.pedido.get('estado') in (None, 'copiando'):
             cmd |= PEDIDO
         return cmd
@@ -466,6 +466,16 @@ class Sessao:
             self.enviar_tela()
 
     # ---- aviso falado no PS2 (23/10/2026) ----
+    def ler_aviso_seq(self):
+        """O contador fica em ps2/aviso-seq.txt: se ele voltasse a 0 a cada reinício deste servidor, o navegador
+        aberto veria "mudou" e repetiria a última frase (aconteceu às 13:20 de 23/10)."""
+        if not hasattr(self, 'aviso_seq'):
+            try:
+                self.aviso_seq = int(open(os.path.join(PASTA_PS2, 'aviso-seq.txt')).read().strip()) & 0xFF
+            except (OSError, ValueError):
+                self.aviso_seq = 0
+        return self.aviso_seq
+
     def falar(self, som, texto):
         """Copia ps2/sons/<som>.raw (PCM 16 bits mono 22050 Hz, voz Piper pt-BR) para ps2/aviso.raw, soma o contador
         e mostra a faixa: a tela muda, o dif.bin leva o contador novo e o navegador toca a frase uma vez."""
@@ -474,8 +484,31 @@ class Sessao:
             return
         with open(origem, 'rb') as f:
             gravar(os.path.join(PASTA_PS2, 'aviso.raw'), f.read())
-        self.aviso_seq = (getattr(self, 'aviso_seq', 0) + 1) & 0xFF
+        self.aviso_seq = (self.ler_aviso_seq() + 1) & 0xFF
+        gravar(os.path.join(PASTA_PS2, 'aviso-seq.txt'), str(self.aviso_seq).encode())
         self.avisar(texto, girando=False, cor=(63, 185, 80), segundos=6)
+
+    def resumo_desbloqueios(self):
+        """Ao voltar ao navegador: conquistas desbloqueadas desde o último resumo (ps2/ra/desbloqueios.json, do vigia
+        do videos.py) → plim + "Você desbloqueou novas conquistas." e a faixa com os nomes. O que já foi mostrado fica
+        em ps2/ra/resumo-navegador.json (o histórico é só do videos.py: dois processos não gravam o mesmo arquivo)."""
+        pasta = os.path.join(PASTA_PS2, 'ra')
+        try:
+            hist = json.load(open(os.path.join(pasta, 'desbloqueios.json'), encoding='utf-8'))
+        except (OSError, ValueError):
+            return
+        try:
+            ate = json.load(open(os.path.join(pasta, 'resumo-navegador.json'))).get('ate', 0)
+        except (OSError, ValueError):
+            ate = time.time()   # 1ª vez: não repete o histórico antigo
+        novos = [d for d in hist if (d.get('quando') or 0) > ate]
+        if hist:
+            gravar(os.path.join(pasta, 'resumo-navegador.json'),
+                   json.dumps({'ate': max(d.get('quando') or 0 for d in hist)}).encode())
+        if not novos or not self.aberto():
+            return
+        nomes = ', '.join(d.get('titulo') or '?' for d in novos[-3:]) + ('…' if len(novos) > 3 else '')
+        self.falar('trofeu-resumo', f'🏆 {len(novos)} conquista{"s" if len(novos) > 1 else ""}: {nomes}')
 
     # ---- 🏆 conquistas (23/10/2026): listas preparadas na box (ps2/ra/*.wl) vão sozinhas para o pendrive do PS2 ----
     def sincronizar_ra(self):
@@ -680,6 +713,7 @@ class Sessao:
                 self.ra_copiado = False   # pode ser outro pendrive
                 threading.Timer(4, self.verificar_pendrive).start()
                 threading.Timer(10, self.sincronizar_ra).start()   # 🏆 listas de conquistas novas → pendrive do PS2
+                threading.Timer(12, self.resumo_desbloqueios).start()   # 🏆 o que foi desbloqueado no jogo
                 threading.Thread(target=self.enviar_tela, args=(True,), daemon=True).start()
             self.ult_entrada = time.time()
             botoes, cx, cy, rx, ry, seq, n_teclas, roda = struct.unpack('<HHHbbIHb', d[4:19])
@@ -855,6 +889,9 @@ def controle_um(sessao, c):
             c.sendall(b'ok\n')
     elif pedido.startswith('video '):
         c.sendall((sessao.video(pedido[6:].strip()) + '\n').encode())
+    elif pedido == 'resumo':   # teste do resumo de conquistas do navegador
+        sessao.resumo_desbloqueios()
+        c.sendall(b'ok\n')
     elif pedido.startswith('falar '):   # teste do aviso falado: "falar copia-concluida"
         som = os.path.basename(pedido[6:].strip())
         if not sessao.aberto():

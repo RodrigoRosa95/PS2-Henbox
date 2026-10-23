@@ -24,6 +24,22 @@ Henbox acrescenta é tirar o trabalho manual do caminho: **ninguém precisa abri
    desbloqueadas na partida e, por jogo, a lista com as medalhas (coloridas quando desbloqueadas). As medalhas vêm do
    site do RetroAchievements uma vez e ficam guardadas na TV box.
 
+## Avisos de conquista
+
+- **No celular:** o app [PS2 Conquistas](../app-conquistas/) ([`downloads/PS2Conquistas.apk`](../downloads/PS2Conquistas.apk))
+  acha a TV box sozinho na rede, mostra o painel (aba *Ao vivo* do xeRAbora e aba *Henbox*) e solta uma notificação a
+  cada desbloqueio, com a medalha, o nome, os pontos e um plim de troféu.
+
+  ![App PS2 Conquistas](telas/app-conquistas.png)
+- **No navegador do PS2:** ao voltar do jogo, a TV toca o plim e fala "Você desbloqueou novas conquistas", com uma
+  faixa que lista os nomes; a página 🏆 mostra as desbloqueadas recentemente.
+- **Por cima do jogo** só dá o brilho dourado do OPL-RA: a memória de vídeo e o chip de som são do jogo enquanto ele
+  roda, não há onde desenhar um pop-up nem tocar um som sem arriscar a partida.
+
+O histórico vem do vigia do `videos.py` (a cada 3 s lê os desbloqueios do xeRAbora e guarda em
+`ps2/ra/desbloqueios.json`), exposto em `GET /conquistas/api/desbloqueios?desde=<epoch>`. O app acha a box por
+`GET /henbox` (`{"app": "ps2-henbox"}`).
+
 ## O que precisa
 
 - O app **xeRAbora** (`xerabora-android.apk`, das [releases](https://github.com/hacan359/xerabora/releases)) na TV box,
