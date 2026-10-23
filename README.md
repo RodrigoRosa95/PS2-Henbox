@@ -61,6 +61,15 @@ O app mostra um **🩺 estado** com ✅/❌ e o que fazer; a TV box **se atualiz
 Passo a passo e telas em [Instalação](docs/instalacao.md#telas). Também há o
 [`pendrive.zip`](https://github.com/RodrigoRosa95/PS2-Henbox/raw/main/downloads/pendrive.zip) para preparar o pendrive pelo PC.
 
+## Contato
+
+Dúvidas, sugestões ou quer testar o PS2 Henbox na sua casa? Fale comigo:
+
+- **WhatsApp:** [+55 51 99994-7239](https://wa.me/5551999947239)
+- **E-mail:** [digorpassos16245@gmail.com](mailto:digorpassos16245@gmail.com)
+
+Teste com os seus próprios jogos; a [loja de demonstração](#como-as-peças-se-encaixam) mostra como fica.
+
 ## Documentação
 
 - [Instalação](docs/instalacao.md) — requisitos e o que vai no memory card, no pendrive do PS2, na TV box e no servidor
