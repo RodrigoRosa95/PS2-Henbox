@@ -24,6 +24,7 @@ controle, pela rede, para a TV box.
 jogos. Ela "desenha" a página e envia a imagem pronta para o PS2, como numa conexão remota.
 
 Vantagens do sistema:
+- principal vantagem o sistema entregar tudo mastigado para o usuário, para o minimo de interação de baixar os app, jogos, e configuração dns para jogos online, o sistema automatizara tudo isso, usuário ira ligar o ps2 na tv box e tera acesso a a tudo atualizado em tempo real.
 - Usuário terá acesso ao catalago de jogos em nuvem com 1 clique no console ps2, e com 1 clique poderá rodar o jogo via htpps em nuvem.
 - administração total do ps2, sem necessidade alguma de pc, tudo administrado no propio ps2 ou celular android se preferir.
 - praticidade para jogar ps2 online, usuário liga o ps2, escolhe o jogo, o sistema executa e ja se conecta automaticamente, sem necessidade de configuração chata de dns por jogo.
