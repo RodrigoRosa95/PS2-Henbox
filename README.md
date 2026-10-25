@@ -28,10 +28,11 @@ Vantagens do sistema:
 - Usuário terá acesso ao catalago de jogos em nuvem com 1 clique no console ps2, e com 1 clique poderá rodar o jogo via htpps em nuvem.
 - administração total do ps2, sem necessidade alguma de pc, tudo administrado no propio ps2 ou celular android se preferir.
 - praticidade para jogar ps2 online, usuário liga o ps2, escolhe o jogo, o sistema executa e ja se conecta automaticamente, sem necessidade de configuração chata de dns por jogo.
-- upload automático em nuvem de saves por jogo, para contornar limitação de 8mb no memory card fisico.
+- upload automático em nuvem de saves por jogo, para contornar limitação de 8mb no memory card fisico, e uso do mesmo save no pcsx2 no pc.
 - acompanhamento em tempo real do sistema de conquistas de jogos parecidos com o do ps3/ps4 no celular android do usuario.
 - a loja oferece a lsta de jogos em nuvem, com opções de instalação no pendrive plugado a tv box, no pendrive direto na usb do ps2, ou na memoria interna do celular android, com usuario podendo posteriormente comparilhar o jogo a partir do celular diretamente para o ps2.
 - -tv box fara o download sempre da versão mais atualizado do opl, para poupar o usuario de fazer isso manualmente.
+
 
 ![Arquitetura](docs/arquitetura.png)
 
