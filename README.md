@@ -29,6 +29,7 @@ Vantagens do sistema:
 - praticidade para jogar ps2 online, usuário liga o ps2, escolhe o jogo, o sistema executa e ja se conecta automaticamente, sem necessidade de configuração chata de dns por jogo.
 - upload automático em nuvem de saves por jogo, para contornar limitação de 8mb no memory card fisico.
 - acompanhamento em tempo real do sistema de conquistas de jogos parecidos com o do ps3/ps4 no celular android do usuario.
+- a loja oferece a lsta de jogos em nuvem, com opções de instalação no pendrive plugado a tv box, no pendrive direto na usb do ps2, ou na memoria interna do celular android, com usuario podendo posteriormente comparilhar o jogo a partir do celular diretamente para o ps2.
 
 ![Arquitetura](docs/arquitetura.png)
 
