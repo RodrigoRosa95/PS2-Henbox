@@ -23,6 +23,13 @@ controle, pela rede, para a TV box.
 **TV box Android (o cérebro):** renderiza a interface da loja que você vê no PS2, gerencia os arquivos e serve os
 jogos. Ela "desenha" a página e envia a imagem pronta para o PS2, como numa conexão remota.
 
+Vantagens do sistema:
+- Usuário terá acesso ao catalago de jogos em nuvem com 1 clique no console ps2, e com 1 clique poderá rodar o jogo via htpps em nuvem.
+- administração total do ps2, sem necessidade alguma de pc, tudo administrado no propio ps2 ou celular android se preferir.
+- praticidade para jogar ps2 online, usuário liga o ps2, escolhe o jogo, o sistema executa e ja se conecta automaticamente, sem necessidade de configuração chata de dns por jogo.
+- upload automático em nuvem de saves por jogo, para contornar limitação de 8mb no memory card fisico.
+- acompanhamento em tempo real do sistema de conquistas de jogos parecidos com o do ps3/ps4 no celular android do usuario.
+
 ![Arquitetura](docs/arquitetura.png)
 
 **Veja o link demonstratibo de loja:** [(apenas visualização)](https://ps2videos.rodrigoflix.com/loja/?convite=DUxWDdci7OSb). São
