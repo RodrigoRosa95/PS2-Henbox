@@ -30,6 +30,7 @@ Vantagens do sistema:
 - upload automático em nuvem de saves por jogo, para contornar limitação de 8mb no memory card fisico.
 - acompanhamento em tempo real do sistema de conquistas de jogos parecidos com o do ps3/ps4 no celular android do usuario.
 - a loja oferece a lsta de jogos em nuvem, com opções de instalação no pendrive plugado a tv box, no pendrive direto na usb do ps2, ou na memoria interna do celular android, com usuario podendo posteriormente comparilhar o jogo a partir do celular diretamente para o ps2.
+- -tv box fara o download sempre da versão mais atualizado do opl, para poupar o usuario de fazer isso manualmente.
 
 ![Arquitetura](docs/arquitetura.png)
 
