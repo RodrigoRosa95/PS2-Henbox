@@ -9,7 +9,7 @@ a chave); as ações de SNES rodam AQUI (baixa a ROM do notebook se faltar e man
 PS2 / jogar); as de jogos de PS2 (ISO na TV box de casa) só funcionam com o notebook na mesma rede.
 Uso: videos.py [porta]
 """
-import html, json, os, re, socket, sys, time, urllib.error, urllib.parse, urllib.request
+import html, json, os, re, shlex, shutil, socket, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
@@ -80,6 +80,245 @@ def navegador(pedido):
             return c.makefile().readline().strip()
     except OSError as e:
         return f'navegador fora do ar ({e})'
+
+
+# ---------- 🗄 Cache da loja (25/10/2026): a loja inteira de olhar NO notebook desligado ----------
+# Um difusor a cada 5 min copia para cache-loja/ a página, temperatura.js, api/loja, api/loja/snes e todas as capas
+# que aparecem no catálogo. Quando o notebook não responde (remoto → 502), o servidor de /loja/* cai aqui e serve
+# o cache: a loja continua navendo (instalar, baixar e ficha de jogo precisam do notebook — a capa da tela avisa).
+CACHE_LOJA = os.path.join(PASTA, 'cache-loja')
+_cache = {}   # nome do arquivo → (mtime, tamanho) na última passada (evita regravar igual)
+
+
+def cache_log(*a):
+    print(time.strftime('%d/%m %H:%M:%S'), 'cache da loja:', *a, flush=True)
+
+
+def cache_salvar(nome, dados):
+    os.makedirs(os.path.dirname(os.path.join(CACHE_LOJA, nome)), exist_ok=True)
+    arq = os.path.join(CACHE_LOJA, nome)
+    st = os.stat(arq) if os.path.exists(arq) else None
+    if st and st.st_size == len(dados) and st.st_mtime > time.time() - 2:
+        return   # igual ao que já há: não regrava (e não empurra dif inútil)
+    with open(arq + '.tmp', 'wb') as f:
+        f.write(dados)
+    os.replace(arq + '.tmp', arq)
+    cache_log(nome, f'{len(dados) >> 10} KB')
+
+
+def cache_meta():
+    try:
+        return json.load(open(os.path.join(CACHE_LOJA, 'meta.json'), encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+
+
+def cache_capas_do_json(obj, limite=60):
+    """Todo 'capa': 'capas/…' (fronteando dicionários e listas do catálogo) que o cache ainda não tem.
+    Devolve quantas baixou (o limite protege o ciclo de uma varredura enorme do notebook)."""
+    faltou = 0
+    cont = {'vista': 0, 'tinha': 0, 'baixou': 0, 'erro': 0}
+    pilha = [obj]
+    while pilha and faltou < limite:
+        o = pilha.pop()
+        if isinstance(o, dict):
+            c = o.get('capa')
+            if isinstance(c, str) and c.startswith('capas/') and '..' not in c:
+                cont['vista'] += 1
+                nome = c[len('capas/'):]
+                if not os.path.exists(os.path.join(CACHE_LOJA, 'capas', nome)):
+                    st, _, d = remoto('/loja/' + urllib.parse.quote(c), 15)
+                    if st == 200 and d:
+                        cache_salvar('capas/' + nome, d)
+                        cont['baixou'] += 1
+                        faltou += 1
+                    else:
+                        cont['erro'] += 1
+                        cache_log('capa fora do ar:', c)
+                else:
+                    cont['tinha'] += 1
+            pilha.extend(o.values())
+        elif isinstance(o, list):
+            pilha.extend(o)
+    cache_log('capas do json:', cont, 'limite', limite)
+    return faltou
+
+
+def laco_cache():
+    time.sleep(20)
+    while True:
+        try:
+            st, _, d = remoto('/loja/api/loja', 10)
+            cache_log('ciclo: remoto', st)
+            if st == 200:
+                cache_salvar('api-loja.json', d)
+                for cam, nome in (('/loja/loja.html', 'loja.html'), ('/loja/temperatura.js', 'temperatura.js'),
+                                  ('/loja/api/loja/snes', 'api-loja-snes.json'), ('/loja/api/online', 'api-online.json')):
+                    s, _, c = remoto(cam, 15)
+                    if s == 200:
+                        cache_salvar(nome, c)
+                faltou = cache_capas_do_json(json.loads(d), limite=60)   # 60 por ciclo até o cache bater completo
+                try:
+                    faltou += cache_capas_do_json(json.load(open(os.path.join(CACHE_LOJA, 'api-loja-snes.json'),
+                                                                 encoding='utf-8')), limite=max(0, 60 - faltou))
+                except (OSError, ValueError):
+                    pass
+                if faltou:
+                    cache_log(f'capas: +{faltou}')
+                os.makedirs(CACHE_LOJA, exist_ok=True)
+                meta = {'quando': int(time.time()), 'quando_txt': time.strftime('%d/%m %H:%M')}
+                with open(os.path.join(CACHE_LOJA, 'meta.json') + '.tmp', 'w', encoding='utf-8') as f:
+                    json.dump(meta, f, ensure_ascii=False)
+                os.replace(os.path.join(CACHE_LOJA, 'meta.json') + '.tmp', os.path.join(CACHE_LOJA, 'meta.json'))
+        except Exception as e:
+            cache_log('ciclo falhou:', e)
+        time.sleep(300)
+
+
+_TIPO_DOM = {'.html': 'text/html; charset=utf-8', '.js': 'application/javascript', '.json': 'application/json',
+             '.jpg': 'image/jpeg', '.png': 'image/png'}
+
+
+def cache_loja_ler(caminho):
+    """Servindo /loja/<caminho> do cachecake (o notebook não responde). (tipo, dados) ou (None, b'')."""
+    cam = caminho[len('/loja/'):] if caminho.startswith('/loja/') else caminho
+    for i in cam.split('/'):
+        if i in ('', '.') or '..' in i or i.startswith('.'):
+            return 503, 'application/json', json.dumps({'erro': 'caminho de cache inválido'}).encode()
+    try:
+        for nome in ('loja.html', 'temperatura.js'):
+            if cam == nome and os.path.exists(os.path.join(CACHE_LOJA, nome)):
+                return _TIPO_DOM[os.path.splitext(nome)[1]], open(os.path.join(CACHE_LOJA, nome), 'rb').read()
+        if cam == 'api/loja':
+            d = open(os.path.join(CACHE_LOJA, 'api-loja.json'), 'rb').read()
+            cat = json.loads(d)
+            try:   # mesmo enxerto do online: o que a box copiou para o pendrive do PS2
+                cat['ps2'] = json.load(open(os.path.join(PASTA, 'ps2', 'no-ps2.json'), encoding='utf-8'))
+            except (OSError, ValueError):
+                pass
+            cat['cache'] = {'quando': cache_meta().get('quando_txt', '?')}
+            d = json.dumps(cat, ensure_ascii=False).encode()
+            return 'application/json', d
+        if cam == 'api/loja/snes':
+            d = open(os.path.join(CACHE_LOJA, 'api-loja-snes.json'), 'rb').read()
+            try:
+                s = json.loads(d)
+                s['cache'] = {'quando': cache_meta().get('quando_txt', '?')}
+                d = json.dumps(s, ensure_ascii=False).encode()
+            except ValueError:
+                pass
+            return 'application/json', d
+        if cam == 'api/online':
+            d = open(os.path.join(CACHE_LOJA, 'api-online.json'), 'rb').read()
+            try:
+                s = json.loads(d)
+                s['cache'] = {'quando': cache_meta().get('quando_txt', '?')}
+                d = json.dumps(s, ensure_ascii=False).encode()
+            except ValueError:
+                pass
+            return 'application/json', d
+        if cam.startswith('capas/'):
+            arq = os.path.join(CACHE_LOJA, cam)
+            if os.path.isfile(arq):
+                return _TIPO_DOM.get(os.path.splitext(cam)[1].lower(), 'application/octet-stream'), open(arq, 'rb').read()
+    except OSError:
+        pass
+    return None, b''
+
+
+# ---------- 🎵 Música de fundo da loja (24/10/2026) ----------
+# As faixas do pacote (ps2/trilhas) são originais e livres. As do usuário vêm da pasta MUSICAS/ do pendrive da box
+# (mp3/ogg/wav/flac/m4a que a pessoa mesma pôs lá): o ffmpeg do Termux converte para o som do PS2 (22050 Hz mono
+# 16 bits), até 90 s com entrada e saída suaves, em ps2/trilhas-usuario. Nada disso vai no pacote.
+MUSICAS_EXT = ('.mp3', '.ogg', '.wav', '.flac', '.m4a', '.opus')
+TRILHAS_USUARIO = os.path.join(PASTA, 'ps2', 'trilhas-usuario')
+
+
+def pasta_musicas():
+    try:
+        for d in sorted(os.listdir('/storage')):
+            m = os.path.join('/storage', d, 'MUSICAS')
+            if '-' in d and os.path.isdir(m):
+                return m
+    except OSError:
+        pass
+    return os.environ.get('PS2_MUSICAS')
+
+
+def converter_musicas():
+    """Converte as músicas novas de MUSICAS/ e tira da lista as que sumiram. Devolve quantas faixas do usuário há."""
+    origem = pasta_musicas()
+    os.makedirs(TRILHAS_USUARIO, exist_ok=True)
+    indice = os.path.join(TRILHAS_USUARIO, 'trilhas.json')
+    try:
+        antigas = {t['origem']: t for t in json.load(open(indice, encoding='utf-8'))}
+    except (OSError, ValueError, KeyError):
+        antigas = {}
+    lista = []
+    # O FAT32 da TV box fica a raiz: o termux não abre o diretório nem o arquivo (PermissionError 13, 25/10/2026).
+    # Tenta o acesso direto; negado, lista com o root e converte cada um com o ffmpeg do termux rodando root,
+    # devolvendo o .raw ao termux (chown 10081) para o os.replace seguir no fluxo de sempre.
+    via_root, ffmpeg = False, shutil.which('ffmpeg') or 'ffmpeg'
+    nomes = []
+    if origem:
+        try:
+            nomes = sorted(n for n in os.listdir(origem) if n.lower().endswith(MUSICAS_EXT))
+        except OSError:
+            nomes = [s for s in como_root('ls -1 ' + shlex.quote(origem), 15).splitlines()
+                     if s.lower().endswith(MUSICAS_EXT)]
+            via_root = bool(nomes)
+    for n in (sorted(nomes) if via_root else nomes):
+        arq = os.path.join(origem, n)
+        q = shlex.quote
+        if via_root:
+            assinatura = como_root('stat -c %s:%Y ' + q(arq), 15).strip()
+            if ':' not in assinatura:   # arquivo sumiu a meio da listagem
+                continue
+        else:
+            assinatura = f'{os.path.getsize(arq)}:{int(os.path.getmtime(arq))}'
+        fid = 'u-' + re.sub(r'[^a-z0-9]+', '-', n.rsplit('.', 1)[0].lower()).strip('-')[:40]
+        t = antigas.get(n)
+        if t and t.get('assinatura') == assinatura and os.path.exists(os.path.join(TRILHAS_USUARIO, t['id'] + '.raw')):
+            lista.append(t)
+            continue
+        saida = os.path.join(TRILHAS_USUARIO, fid + '.raw')
+        opcoes = ['-v', 'error', '-y', '-i', q(arq) if via_root else arq, '-t', '90',
+                  '-af', 'afade=t=in:d=1,areverse,afade=t=in:d=2,areverse', '-ac', '1', '-ar', '22050',
+                  '-f', 's16le', q(saida + '.tmp') if via_root else saida + '.tmp']
+        if via_root:
+            cmd = ('env LD_LIBRARY_PATH=/data/data/com.termux/files/usr/lib ' + q(ffmpeg) + ' ' + ' '.join(opcoes)
+                   + ' && [ -s ' + q(saida + '.tmp') + ' ] && chown 10081 ' + q(saida + '.tmp'))
+            p = subprocess.run(['su', '-c', cmd], capture_output=True, text=True, timeout=300)
+            ok, err = p.returncode == 0, (p.stdout + p.stderr).strip()[-200:]
+        else:
+            r = subprocess.run(['ffmpeg'] + opcoes, capture_output=True, timeout=300)
+            ok, err = r.returncode == 0, (r.stderr or b'')[-200:]
+        if not ok or not os.path.getsize(saida + '.tmp'):
+            print(f'música {n}: ffmpeg falhou: {err}', flush=True)
+            como_root('rm -f ' + q(saida + '.tmp'), 15) if via_root else None
+            continue
+        os.replace(saida + '.tmp', saida)
+        lista.append({'id': fid, 'titulo': n.rsplit('.', 1)[0][:60], 'segundos': round(os.path.getsize(saida) / 44100, 1),
+                      'credito': 'sua música (pasta MUSICAS do pendrive)', 'origem': n, 'assinatura': assinatura})
+    for t in antigas.values():   # as que saíram do pendrive
+        if t not in lista and not any(x['id'] == t['id'] for x in lista):
+            try:
+                os.remove(os.path.join(TRILHAS_USUARIO, t['id'] + '.raw'))
+            except OSError:
+                pass
+    with open(indice + '.tmp', 'w', encoding='utf-8') as f:
+        json.dump(lista, f, ensure_ascii=False, indent=1)
+    os.replace(indice + '.tmp', indice)
+    return len(lista)
+
+
+def laco_musicas():
+    while True:
+        try:
+            converter_musicas()
+        except Exception as e:
+            print('músicas do pendrive:', e, flush=True)
+        time.sleep(600)
 
 
 # ---------- 🏆 Conquistas (23/10/2026): página montada aqui com os dados do app xeRAbora desta box ----------
@@ -250,8 +489,10 @@ ESTILO_RA = ('<style>.topo{margin:6px 20px 10px;color:#9fb4e0;font-size:16px} .t
              '.barra i{display:block;height:100%;background:#ffd166}</style>')
 
 
-def pagina_no_ps2(msg=''):
-    """💾 Jogos no pendrive do PS2 (ps2/no-ps2.json, anotados pelo navegador_servidor nas cópias) com ▶ Jogar direto."""
+def pagina_no_ps2(msg='', online=False):
+    """💾 Jogos no pendrive do PS2 (ps2/no-ps2.json, anotados pelo navegador_servidor nas cópias) com ▶ Jogar direto.
+    online=True (🌐 Jogar online, 23/10/2026): mesma lista, mas abre pelo OPL oficial — o OPL-RA ocupa a placa de rede
+    com a telemetria das conquistas e o jogo dá "erro de hardware" na configuração de rede."""
     try:
         jogos = json.load(open(os.path.join(PASTA, 'ps2', 'no-ps2.json'), encoding='utf-8'))
     except (OSError, ValueError):
@@ -261,12 +502,21 @@ def pagina_no_ps2(msg=''):
         serial = arq[:11] if re.match(r'^[A-Z]{4}_\d{3}\.\d{2}\.', arq) else ''
         nome = os.path.splitext(arq[12:] if serial else arq)[0]
         ra = ind.get(serial) or {}
-        tag = f'🏆 {ra.get("total", "")} conquistas · ' if ra.get('id') else ''
-        itens += (f'<a class="b" href="/no-ps2/jogar?arquivo={urllib.parse.quote(arq)}">▶ {html.escape(nome)}'
-                  f'<div class="p">{tag}{html.escape(serial or "sem código")} · copiado em {html.escape(jogos[arq].get("quando", ""))}</div></a>')
+        tag = f'🏆 {ra.get("total", "")} conquistas · ' if ra.get('id') and not online else ''
+        itens += (f'<a class="b" href="/no-ps2/jogar?arquivo={urllib.parse.quote(arq)}{"&online=1" if online else ""}">'
+                  f'{"🌐" if online else "▶"} {html.escape(nome)}'
+                  f'<div class="p">{tag}{html.escape(serial or "sem código")} · {html.escape(jogos[arq].get("pasta", "DVD"))}'
+                  + (f' · copiado em {html.escape(jogos[arq]["quando"])}' if jogos[arq].get('quando') else '') + '</div></a>')
     if not itens:
-        itens = '<div class="msg">Nenhum jogo copiado ainda. Na Loja, use ⬇ Copiar para o PS2.</div>'
+        itens = ('<div class="msg">Nenhum jogo nas pastas DVD e CD do pendrive do PS2. Na Loja, use 🎮 Instalar no '
+                 'pendrive USB do PS2.</div>')
+    # a lista é lida do pendrive do PS2 quando o navegador abre (navegador_servidor.listar_jogos_pendrive)
+    itens = (f'<a class="b" href="/no-ps2/ler{"?online=1" if online else ""}">🔄 Ler o pendrive de novo</a>') + itens
     aviso = f'<div class="msg">{html.escape(msg)}</div>' if msg else ''
+    if online:
+        return ('<h1>🌐 Jogar online</h1><div class="msg">Abre pelo OPL normal (sem conquistas), com a rede livre para o '
+                'jogo. Na configuração de rede do jogo use IP automático (DHCP).</div>' + aviso +
+                '<div class="lista"><a class="b" href="/">← Voltar</a>' + itens + '</div>')
     return '<h1>💾 No pendrive do PS2</h1>' + aviso + '<div class="lista"><a class="b" href="/">← Voltar</a>' + itens + '</div>'
 
 
@@ -313,6 +563,7 @@ def pagina_conquistas():
     if not jogos:
         itens += '<div class="msg">Nenhum jogo ainda. Na Loja, use 🏆 Preparar conquistas num jogo.</div>'
     return (ao_vivo() + '<h1>🏆 Conquistas</h1>' + ESTILO_RA + topo + '<div class="lista"><a class="b" href="/">← Voltar</a>'
+            + f'<a class="b" href="{html.escape(LOJA)}">🛒 Loja PS2</a>'
             + itens + '</div>')
 
 
@@ -332,6 +583,198 @@ def pagina_jogo_ra(jid):
     topo = f'<div class="topo"><b>{g.get("awarded", 0)} de {g.get("total", len(conq))}</b> desbloqueadas</div>'
     return (ao_vivo() + f'<h1>{html.escape(g.get("title") or "🏆")}</h1>' + ESTILO_RA + topo
             + '<div class="lista"><a class="b" href="/conquistas">← Voltar</a>' + itens + '</div>')
+
+
+# ---------- 🌐 Evento online (23/10/2026): partidas marcadas no notebook (evento_online.py, /evento no WhatsApp) ----------
+EVENTOS = os.path.join(PASTA, 'ps2', 'eventos.json')   # cópia local: vale mesmo com o notebook fora do alcance
+DNS_EVENTO = os.path.join(PASTA, 'dns-evento')          # "IP INÍCIO FIM" (epoch): o henbox-root.sh (root) aplica
+REDE = '/data/local/henbox-rede'                        # estado do PS2 no cabo, escrito pelo henbox-root.sh
+
+
+# ---------- 📶 Wi-Fi da TV box (23/10/2026): busca pelo iw (root) e o app PS2 Navegador (Wifi.java) conecta ----------
+WIFI_ESTADO = {'estado': '', 'ssid': '', 'msg': '', 't': 0}   # último aviso do Wifi.java (POST /wifi/resposta)
+
+
+def como_root(cmd, timeout=30):
+    try:
+        return subprocess.run(['su', '-c', cmd], capture_output=True, text=True, timeout=timeout).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ''
+
+
+def _nome_iw(t):   # o iw escreve bytes fora do ASCII como \xNN
+    b = re.sub(r'\\x([0-9a-fA-F]{2})', lambda m: chr(int(m.group(1), 16)), t).encode('latin-1', 'replace')
+    return b.decode('utf-8', 'replace').strip()
+
+
+def wifi_atual():
+    m = re.search(r'SSID: (.*)', como_root('iw dev wlan0 link', 10))
+    return _nome_iw(m.group(1)) if m else ''
+
+
+def wifi_redes():
+    """[{ssid, sinal (dBm), segura}] da busca do iw, do sinal mais forte para o mais fraco (sem nomes repetidos)."""
+    saida = como_root('iw dev wlan0 scan 2>/dev/null || iw dev wlan0 scan dump', 30)
+    redes = {}
+    for bloco in re.split(r'\n(?=BSS )', saida):
+        m = re.search(r'\n\s*SSID: (.*)', bloco)
+        if not m or not m.group(1).strip():
+            continue   # rede oculta
+        ssid = _nome_iw(m.group(1))
+        s = re.search(r'signal: (-?[\d.]+)', bloco)
+        sinal = float(s.group(1)) if s else -100.0
+        segura = bool(re.search(r'RSN:|WPA:|Privacy', bloco))
+        if ssid not in redes or sinal > redes[ssid]['sinal']:
+            redes[ssid] = {'ssid': ssid, 'sinal': sinal, 'segura': segura}
+    return sorted(redes.values(), key=lambda r: -r['sinal'])
+
+
+def barras(dbm):
+    return '▂▄▆█' if dbm >= -55 else '▂▄▆' if dbm >= -67 else '▂▄' if dbm >= -78 else '▂'
+
+
+def pagina_wifi():
+    atual, est = wifi_atual(), WIFI_ESTADO
+    recente = time.time() - est['t'] < 300
+    conectando = recente and est['estado'] == 'conectando'
+    topo = (f'<div class="msg">Conectada em <b>{html.escape(atual)}</b></div>' if atual
+            else '<div class="msg">Sem Wi-Fi agora</div>')
+    if recente and est['msg']:
+        cor = {'ok': '#3fb950', 'erro': '#f85149'}.get(est['estado'], '#ffd166')
+        topo += (f'<div class="msg" style="color:{cor}">{html.escape(est["ssid"])}: {html.escape(est["msg"])}</div>')
+    itens = ''
+    if not conectando:
+        for r in wifi_redes():
+            liga = '✔ ' if r['ssid'] == atual else ''
+            itens += (f'<a class="b" href="/wifi/rede?ssid={urllib.parse.quote(r["ssid"])}">{liga}{html.escape(r["ssid"])}'
+                      f'<div class="p">{barras(r["sinal"])} {r["sinal"]:.0f} dBm · {"🔒 com senha" if r["segura"] else "aberta"}</div></a>')
+        itens = itens or '<div class="msg">Nenhuma rede encontrada.</div>'
+    return (('<meta http-equiv="refresh" content="3">' if conectando else '') + '<h1>📶 Wi-Fi da TV box</h1>' + topo
+            + '<div class="lista"><a class="b" href="/">← Voltar</a>'
+            + ('' if conectando else '<a class="b" href="/wifi">🔄 Buscar de novo</a>') + itens + '</div>')
+
+
+def pagina_wifi_rede(ssid):
+    segura = next((r['segura'] for r in wifi_redes() if r['ssid'] == ssid), True)
+    campo = ('<div class="msg">Senha (rede já salva na box: pode deixar em branco):</div><input name="senha" autocomplete="off" style="margin:0 20px 12px;width:560px;'
+             'font-size:24px;padding:10px;border-radius:8px;border:0">' if segura else
+             '<div class="msg">Rede aberta, sem senha.</div>')
+    return (f'<h1>📶 {html.escape(ssid)}</h1><form method="post" action="/wifi/conectar">'
+            f'<input type="hidden" name="ssid" value="{html.escape(ssid)}">{campo}'
+            '<div class="msg" style="color:#9fb4e0;font-size:15px">Se não conectar em 60 s, a box volta sozinha para a rede '
+            'atual. Fora da rede de casa, a Loja e os vídeos vêm pela internet (Cloudflare); o PS2 no cabo da box continua '
+            'ligado.</div><div class="lista" style="height:auto"><button class="b" style="width:100%;border:0;font-size:inherit;'
+            'text-align:left">📶 Conectar</button><a class="b" href="/wifi">← Voltar</a></div></form>')
+
+
+def wifi_conectar(ssid, senha):
+    if not ssid or len(ssid.encode()) > 32:
+        return 'nome de rede inválido'
+    if senha and not 8 <= len(senha) <= 63:
+        return 'a senha do Wi-Fi tem de 8 a 63 caracteres'
+    WIFI_ESTADO.update(estado='conectando', ssid=ssid, msg='conectando…', t=time.time())
+    como_root('am startservice -n br.ps2nav/.Wifi --es ssid ' + shlex.quote(ssid)
+              + ' --es senha ' + shlex.quote(senha), 15)
+    return 'ok'
+
+
+def ler_eventos():
+    try:
+        return [e for e in json.load(open(EVENTOS, encoding='utf-8')) if (e.get('inicio') or 0) + e.get('depois', 0) > time.time()]
+    except (OSError, ValueError):
+        return []
+
+
+def janela_dns():
+    """A janela do DNS do evento em andamento (ou do próximo); vazio se não há evento com DNS."""
+    agora = time.time()
+    for e in sorted(ler_eventos(), key=lambda e: e.get('inicio') or 0):
+        if e.get('inicio') and e.get('dns') and e['inicio'] + e.get('depois', 0) > agora:
+            return f"{e['dns'][0]} {e['inicio'] - e.get('antes', 3600)} {e['inicio'] + e.get('depois', 0)}"
+    try:   # kit online aplicado pela central do celular (central.py, 24/10/2026): {"ip", "ate"} em ~/ps2nav/dns-kit.json
+        k = json.load(open(os.path.join(PASTA, 'dns-kit.json')))
+        if k.get('ip') and k.get('ate', 0) > agora:
+            return f"{k['ip']} {int(agora) - 60} {int(k['ate'])}"
+    except (OSError, ValueError):
+        pass
+    return ''
+
+
+def laco_eventos():
+    n = 0
+    while True:
+        if n % 5 == 0:   # do notebook a cada 5 min
+            st, _, d = remoto('/eventos', timeout=20)
+            if st == 200:
+                try:
+                    evs = json.loads(d)
+                    with open(EVENTOS + '.tmp', 'w', encoding='utf-8') as f:
+                        json.dump(evs, f, ensure_ascii=False)
+                    os.replace(EVENTOS + '.tmp', EVENTOS)
+                except (OSError, ValueError) as e:
+                    print('eventos:', e, flush=True)
+        try:
+            j = janela_dns()
+            if (open(DNS_EVENTO).read().strip() if os.path.exists(DNS_EVENTO) else '') != j:
+                with open(DNS_EVENTO, 'w') as f:
+                    f.write(j + '\n' if j else '')
+        except OSError as e:
+            print('dns-evento:', e, flush=True)
+        n += 1
+        time.sleep(60)
+
+
+def ler_rede(nome):
+    try:
+        return open(os.path.join(REDE, nome)).read().strip()
+    except OSError:
+        return ''
+
+
+def estado_evento():
+    cabo = ler_rede('estado').split()
+    try:   # captura-jogo.py (root): partidas online gravadas para achar o placar
+        cap = json.loads(ler_rede('capturas/resumo.json') or '{}')
+    except ValueError:
+        cap = {}
+    return {'cabo': cabo[0] if cabo else '', 'dns_ativo': ler_rede('dns-evento-ativo'), 'janela': janela_dns(),
+            'eventos': len(ler_eventos()), 'captura': cap}
+
+
+def quando_txt(ts):
+    falta = ts - time.time()
+    d = time.localtime(ts)
+    dia = 'hoje' if time.strftime('%d/%m', d) == time.strftime('%d/%m') else time.strftime('%d/%m', d)
+    if falta > 0:
+        h, m = int(falta // 3600), int(falta % 3600 // 60)
+        return f'{dia} às {time.strftime("%H:%M", d)} · falta {f"{h} h " if h else ""}{m} min'
+    return f'começou às {time.strftime("%H:%M", d)} · rolando agora'
+
+
+def pagina_evento():
+    evs = sorted(ler_eventos(), key=lambda e: e.get('inicio') or 0)
+    est = estado_evento()
+    itens = ''
+    for e in evs:
+        if est['dns_ativo'] and e.get('dns') and est['dns_ativo'] == e['dns'][0]:
+            dns = f'✅ DNS {e["dns"][0]} ligado no PS2 (automático)'
+        elif est['cabo']:
+            dns = f'⏳ DNS {", ".join(e.get("dns") or ["?"])} entra sozinho 1 h antes'
+        else:
+            dns = f'⚠ PS2 fora do cabo da box: ponha o DNS {", ".join(e.get("dns") or ["?"])} na rede do jogo'
+        itens += (f'<div class="ev"><div class="t">🎮 {html.escape(e.get("jogo") or "?")}</div>'
+                  f'<div class="q">🕗 {html.escape(quando_txt(e["inicio"]) if e.get("inicio") else "horário a confirmar")}</div>'
+                  + (f'<div class="s">🖥️ Servidor: <b>{html.escape(e["servidor"])}</b></div>' if e.get('servidor') else '')
+                  + f'<div class="d">{html.escape(dns)}</div></div>')
+    if not itens:
+        itens = '<div class="msg">Nenhum evento online marcado. No WhatsApp: /evento + o anúncio.</div>'
+    cap = est.get('captura') or {}
+    if cap.get('gravando'):
+        itens += f'<div class="msg">🔴 Gravando a partida para o placar ({cap.get("pacotes", 0)} pacotes)</div>'
+    return ('<meta http-equiv="refresh" content="30"><style>.ev{margin:0 0 12px;padding:12px 16px;background:#132a57;'
+            'border-radius:12px;border-left:5px solid #ffd166}.ev .t{font-size:24px}.ev .q{color:#ffd166;margin:4px 0}'
+            '.ev .s{font-size:18px}.ev .s b{color:#7ee787}.ev .d{color:#9fb4e0;font-size:16px;margin-top:4px}</style>'
+            '<h1>🌐 Evento online</h1><div class="lista">' + itens + '<a class="b" href="/">← Voltar</a></div>')
 
 
 class H(BaseHTTPRequestHandler):
@@ -358,6 +801,11 @@ class H(BaseHTTPRequestHandler):
     def loja_snes(self):
         """Lista de ROMs do notebook + o andamento dos pedidos DESTE navegador (não o da TV box de casa)."""
         st, _, d = remoto('/loja/api/loja/snes')
+        if st != 200:   # notebook fora: a lista salva no cache da loja (sabe os ROMs que já estão no pendrive)
+            t, c = cache_loja_ler('/loja/api/loja/snes')
+            if t:
+                st, d = 200, c
+                cache_log('loja_snes: servido do cache da loja')
         if st != 200:
             return self.json({'roms': [], 'retroarch': {}, 'navegador': False, 'erro': d.decode(errors='ignore')})
         lista_ = json.loads(d)
@@ -381,10 +829,27 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urllib.parse.urlparse(self.path)
+        bruto = self.rfile.read(int(self.headers.get('Content-Length', 0)) or 0)
         try:
-            corpo = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0)) or 0) or b'{}')
+            corpo = json.loads(bruto or b'{}')
         except ValueError:
             corpo = {}
+        if u.path == '/wifi/resposta':   # o Wifi.java avisa cada passo (só daqui da box)
+            if self.client_address[0] != '127.0.0.1' or not isinstance(corpo, dict):
+                return self.json({'ok': False}, 403)
+            WIFI_ESTADO.update(estado=str(corpo.get('estado', '')), ssid=str(corpo.get('ssid', '')),
+                               msg=str(corpo.get('msg', '')), t=time.time())
+            return self.json({'ok': True})
+        if u.path == '/wifi/conectar':   # formulário da página 📶
+            f = urllib.parse.parse_qs(bruto.decode('utf-8', 'replace'), keep_blank_values=True)
+            r = wifi_conectar((f.get('ssid') or [''])[0], (f.get('senha') or [''])[0])
+            if r != 'ok':
+                WIFI_ESTADO.update(estado='erro', ssid=(f.get('ssid') or [''])[0], msg=r, t=time.time())
+            self.send_response(303)
+            self.send_header('Location', '/wifi')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
         acao = u.path[len('/loja/'):] if u.path.startswith('/loja/') else ''
         arq = os.path.basename(str(corpo.get('arquivo', '')))
         if acao == 'api/loja/snes/retroarch':
@@ -428,20 +893,33 @@ class H(BaseHTTPRequestHandler):
             st, _, d = remoto('/loja/api/loja')
             jogo = next((j for j in (json.loads(d).get('jogos', []) if st == 200 else [])
                          if j.get('id') == corpo.get('id')), None)
-            if not jogo or not jogo.get('instalado'):
-                return self.json({'ok': False, 'msg': 'só jogos instalados no pendrive da TV box'})
+            if not jogo:
+                return self.json({'ok': False, 'msg': 'jogo não encontrado no catálogo'})
+            # 23/10/2026: o jogo não precisa mais estar no pendrive da box; senão vem do HD do notebook (host:nuvem/)
+            na_box = jogo.get('instalado')
             if acao in ('api/preparar-ra', 'api/copiar-ra'):
                 from ra_preparar import preparar
                 iso = os.path.join(os.path.realpath(os.path.join(PASTA, 'ps2', 'jogos-box')), jogo['arquivo'])
+                titulo = None
                 try:
+                    if not na_box:
+                        import udpfs_nuvem
+                        iso = udpfs_nuvem.IsoRemoto('DVD/' + jogo['arquivo'])
                     _, titulo = preparar(iso, jogo['id'], os.path.join(PASTA, 'ps2', 'ra'))
                 except Exception as e:
-                    return self.json({'ok': False, 'msg': f'Sem conquistas: {e}'})
-                try:
-                    registrar_preparado(jogo['id'], titulo, iso)
-                except Exception:
-                    pass
-                r = navegador(f"copiar2 host:ra/{jogo['id']}.wl|mass:/RA/{jogo['id']}.wl|ra-wl:{jogo['id']}")
+                    if not isinstance(iso, str):
+                        iso.close()
+                    if acao == 'api/preparar-ra':
+                        return self.json({'ok': False, 'msg': f'Sem conquistas: {e}'})
+                    # copiar-ra: o jogo vai assim mesmo, só sem conquistas
+                if titulo:
+                    try:
+                        registrar_preparado(jogo['id'], titulo, iso)
+                    except Exception:
+                        pass
+                    if not isinstance(iso, str):
+                        iso.close()
+                r = navegador(f"copiar2 host:ra/{jogo['id']}.wl|mass:/RA/{jogo['id']}.wl|ra-wl:{jogo['id']}") if titulo else 'ok'
                 if r != 'ok':
                     if acao == 'api/preparar-ra':   # vai para o pendrive do PS2 no "Copiar para o PS2"
                         return self.json({'ok': True, 'msg': f'🏆 {titulo} — preparado (o PS2 recebe ao copiar o jogo)'})
@@ -451,9 +929,12 @@ class H(BaseHTTPRequestHandler):
             if acao == 'api/copiar-ra':   # USB 1.1 do PS2: ~1 MB/s; o progresso aparece na tela do navegador
                 if jogo['tamanho'] >= 4 * 1024 ** 3:
                     return self.json({'ok': False, 'msg': 'maior que 4 GB: não cabe no pendrive FAT32 do PS2'})
-                r = navegador(f"copiar2 host:jogos-box/{jogo['arquivo']}|mass:/DVD/{jogo['arquivo']}|ra:{jogo['id']}")
-                return self.json({'ok': r == 'ok', 'msg': f'Copiando {jogo["nome"]} para o pendrive do PS2 '
-                                  f'(~{jogo["tamanho"] // 1048576 // 60 + 1} min)…' if r == 'ok' else r})
+                origem = f"host:jogos-box/{jogo['arquivo']}" if na_box else f"host:nuvem/DVD/{jogo['arquivo']}"
+                r = navegador(f"copiar2 {origem}|mass:/DVD/{jogo['arquivo']}|ra:{jogo['id']}|{jogo['tamanho']}")
+                return self.json({'ok': r == 'ok', 'msg': f'Copiando {jogo["nome"]} para o pendrive USB do PS2 '
+                                  f'(~{jogo["tamanho"] // 1048576 // 60 + 1} min'
+                                  + ('' if na_box else ', direto do HD do notebook')
+                                  + ('' if titulo else '; sem conquistas') + ')…' if r == 'ok' else r})
             args = f"{jogo['arquivo']}|{jogo['id']}|DVD|bdm"
             if len(args.encode()) > 127:
                 return self.json({'ok': False, 'msg': 'nome do arquivo longo demais para o pedido ao PS2'})
@@ -475,10 +956,33 @@ class H(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         if u.path == '/loja/api/loja/snes':
             return self.loja_snes()
+        if u.path == '/loja/api/musica':   # barra ◀ ▶ da loja: ?acao=estado|proxima|anterior|ligar|desligar|atualizar
+            acao = (urllib.parse.parse_qs(u.query).get('acao') or ['estado'])[0]
+            if acao == 'atualizar':
+                converter_musicas()
+                acao = 'estado'
+            if acao not in ('estado', 'proxima', 'anterior', 'ligar', 'desligar'):
+                return self.json({'erro': 'ação desconhecida'})
+            r = navegador('musica ' + acao)
+            try:
+                return self.json(json.loads(r))
+            except ValueError:
+                return self.json({'erro': r})
         if u.path == '/api/ps2/temperatura':   # temperatura.js da loja pede pela raiz do site
             u = u._replace(path='/loja/api/ps2/temperatura')
         if u.path.startswith('/loja/'):
             st, tipo, d = remoto(u.path + (('?' + u.query) if u.query else ''))
+            if st == 502:   # notebook fora do alcance: a loja serve do cache local (25/10/2026)
+                t, d = cache_loja_ler(u.path)
+                if t:
+                    st, tipo = 200, t
+            if u.path == '/loja/api/loja' and st == 200 and tipo.startswith('application/json'):   # + o que a box copiou para o pendrive do PS2 (no-ps2.json)
+                try:
+                    cat = json.loads(d)
+                    cat['ps2'] = json.load(open(os.path.join(PASTA, 'ps2', 'no-ps2.json'), encoding='utf-8'))
+                    d = json.dumps(cat).encode()
+                except (OSError, ValueError):
+                    pass
             self.send_response(st)
             self.send_header('Content-Type', tipo or 'application/octet-stream')
             self.send_header('Content-Length', str(len(d)))
@@ -487,23 +991,65 @@ class H(BaseHTTPRequestHandler):
             return
         q = urllib.parse.parse_qs(u.query)
         if u.path == '/':
-            self.pagina(f'<h1>PS2</h1><div class="lista"><a class="b grande" href="{html.escape(LOJA)}">🛒 Loja</a>'
-                        '<a class="b grande" href="/videos">🎬 Vídeos</a>'
+            ev = sorted(ler_eventos(), key=lambda e: e.get('inicio') or 0)[:1]
+            botao_ev = (f'<a class="b grande" href="/evento">🌐 {html.escape(ev[0].get("jogo") or "Evento online")}'
+                        f'<div class="p">{html.escape(quando_txt(ev[0]["inicio"]) if ev[0].get("inicio") else "")}</div></a>'
+                        if ev else '')
+            self.pagina(f'<h1>PS2</h1><div class="lista">{botao_ev}<a class="b grande" href="{html.escape(LOJA)}">🛒 Loja</a>'
+                        '<a class="b grande" href="/sms">🎞 Filmes e séries (SMS)</a>'
                         '<a class="b grande" href="/no-ps2">💾 No pendrive do PS2</a>'
-                        '<a class="b grande" href="/conquistas">🏆 Conquistas</a></div>')
+                        '<a class="b grande" href="/no-ps2?online=1">🌐 Jogar online</a>'
+                        '<a class="b grande" href="/conquistas">🏆 Conquistas</a>'
+                        '<a class="b grande" href="/wifi">📶 Wi-Fi da TV box</a>'
+                        '<a class="b grande" href="/reiniciar">🔄 Reiniciar sistema</a></div>')
+        elif u.path == '/wifi':
+            self.pagina(pagina_wifi())
+        elif u.path == '/wifi/rede':
+            self.pagina(pagina_wifi_rede((q.get('ssid') or [''])[0]))
+        elif u.path == '/reiniciar':   # 🔄 (24/10/2026): o navegador fecha, o PS2 volta ao PS2Link do memory card e o
+            # servidor_host da box, ao achar o PS2Link, abre o navegador de novo (IOP e rede do zero)
+            if q.get('sim') != ['1']:   # confirmação na página: um clique sem querer não reinicia
+                return self.pagina('<h1>🔄 Reiniciar sistema</h1><div class="msg">O navegador fecha, o PS2 volta ao '
+                                   '<b>PS2Link</b> e a TV box abre o navegador de novo sozinha (uns 20 segundos).</div>'
+                                   '<div class="lista"><a class="b grande" href="/reiniciar?sim=1">🔄 Reiniciar agora</a>'
+                                   '<a class="b" href="/">← Voltar</a></div>')
+            r = navegador('sair')
+            self.pagina('<h1>🔄 Reiniciando…</h1><div class="msg">' + (
+                'Voltando ao PS2Link. O navegador abre de novo em uns 20 segundos.' if r == 'ok'
+                else 'O navegador não está aberto no PS2 (' + html.escape(r) + ').') + '</div>')
+        elif u.path == '/sms':   # SMS do cinema (23/10/2026): o navegador fecha e o SMS abre na pasta UDPFS
+            r = navegador('sms')
+            self.pagina('<h1>🎞 Filmes e séries</h1><div class="msg">' + (
+                'Abrindo o SMS no PS2… (na 1ª vez ele é instalado no pendrive antes)</div>'
+                '<div class="msg">No SMS: <b>UDPFS → CINEMA-NUVEM</b> e escolha o vídeo.'
+                if r == 'ok' else html.escape(r)) + '</div><div class="lista"><a class="b" href="/">← Voltar</a></div>')
+        elif u.path == '/evento':
+            self.pagina(pagina_evento())
+        elif u.path == '/evento/estado.json':   # o notebook confere antes do evento (evento_online.py)
+            return self.json(estado_evento())
         elif u.path == '/no-ps2':
-            self.pagina(pagina_no_ps2())
+            self.pagina(pagina_no_ps2(online=bool(q.get('online'))))
+        elif u.path == '/no-ps2/ler':
+            r = navegador('listar-pendrive')
+            if r == 'ok':
+                time.sleep(4)   # as duas listas (DVD e CD) costumam voltar em 1-3 s
+            self.pagina(pagina_no_ps2('Lista lida do pendrive do PS2.' if r == 'ok' else r, bool(q.get('online'))))
         elif u.path == '/no-ps2/jogar':
             arq = os.path.basename((q.get('arquivo') or [''])[0])
             try:
                 registrados = json.load(open(os.path.join(PASTA, 'ps2', 'no-ps2.json'), encoding='utf-8'))
             except (OSError, ValueError):
                 registrados = {}
+            online = bool(q.get('online'))
             if arq not in registrados:
-                return self.pagina(pagina_no_ps2('Esse jogo não está na lista do pendrive do PS2.'))
+                return self.pagina(pagina_no_ps2('Esse jogo não está na lista do pendrive do PS2.', online))
             serial = arq[:11] if re.match(r'^[A-Z]{4}_\d{3}\.\d{2}\.', arq) else 'SLUS_000.00'
+            midia = 'CD' if registrados[arq].get('pasta') == 'CD' else 'DVD'
+            if online:   # OPL oficial (ps2/opl/OPNPS2LD.ELF): mesma abertura direta "bdm", rede livre para o jogo
+                r = navegador(f'abrir host:opl/OPNPS2LD.ELF|{arq}|{serial}|{midia}|bdm')
+                return self.pagina(pagina_no_ps2('Abrindo pelo OPL normal…' if r == 'ok' else r, True))
             # OPL-RA pelo pendrive do PS2 ("bdm"): com a lista RA/<serial>.wl tem conquistas, sem ela abre normal
-            r = navegador(f'abrir host:oplra/OPL-RA-SMB.ELF|{arq}|{serial}|DVD|bdm')
+            r = navegador(f'abrir host:oplra/OPL-RA-SMB.ELF|{arq}|{serial}|{midia}|bdm')
             self.pagina(pagina_no_ps2('Abrindo no PS2…' if r == 'ok' else r))
         elif u.path == '/conquistas':
             self.pagina(pagina_conquistas())
@@ -518,7 +1064,7 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(d)
         elif u.path == '/henbox':   # identificação para o app do celular achar esta TV box sozinho na rede
-            return self.json({'app': 'ps2-henbox', 'conquistas': True, 'estado': True})
+            return self.json({'app': 'ps2-henbox', 'conquistas': True, 'estado': True, 'central': 8785})
         elif u.path in ('/estado', '/estado.json'):   # lista de conferência da instalação (configurar.checklist)
             import configurar
             itens = configurar.checklist()
@@ -591,4 +1137,7 @@ if __name__ == '__main__':
     threading.Thread(target=responder_busca, daemon=True).start()
     threading.Thread(target=laco_conquistas, daemon=True).start()   # 🏆 prepara sozinho os ISOs novos
     threading.Thread(target=vigiar_desbloqueios, daemon=True).start()   # 🏆 histórico de desbloqueios
+    threading.Thread(target=laco_eventos, daemon=True).start()
+    threading.Thread(target=laco_musicas, daemon=True).start()   # 🎵 MUSICAS/ do pendrive → faixas da loja
+    threading.Thread(target=laco_cache, daemon=True).start()   # 🗄 cache da loja (o notebook pode estar desligado)
     ThreadingHTTPServer(('0.0.0.0', PORTA), H).serve_forever()

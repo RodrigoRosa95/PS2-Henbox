@@ -15,34 +15,61 @@
   html, body { margin:0; min-height:100%; }
   body { color:var(--texto); font:14px/1.35 system-ui, "Segoe UI", Roboto, sans-serif;
          background:var(--fundo1) radial-gradient(120% 90% at 85% -10%, #1f5fd6 0%, var(--fundo2) 38%, var(--fundo1) 75%) fixed; }
-  /* onda estática no fundo, lembrando o menu do console */
-  body::before { content:""; position:fixed; top:auto; right:0; bottom:0; left:0; height:55%; pointer-events:none; opacity:.35;
+  /* onda estática no fundo, lembrando o menu do console (viva só na vitrine do PC; no PS2, animação vira tráfego) */
+  body::before { content:""; position:fixed; top:auto; right:0; bottom:0; left:0; height:55%; width:104%; pointer-events:none; opacity:.35;
     background:
       radial-gradient(160% 60% at 30% 100%, transparent 58%, rgba(127,178,255,0.333) 59%, transparent 61%),
       radial-gradient(140% 55% at 70% 105%, transparent 60%, rgba(255,255,255,0.251) 61%, transparent 62.5%); }
+  body.vitrine::before { animation: onda 26s ease-in-out infinite alternate; }
+  @keyframes onda { from { transform:translateX(0) } to { transform:translateX(-4%) } }
   header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px; padding:8px 12px;
            background:linear-gradient(180deg, rgba(4,16,42,0.949), rgba(4,16,42,0.8)); border-bottom:1px solid var(--borda); }
   .logo { display:flex; gap:3px; font-weight:900; font-size:15px; letter-spacing:.5px; }
   .logo b { width:18px; height:18px; border-radius:5px; display:grid; place-items:center; font-size:12px; color:#04102a; }
   .logo .t { background:var(--tri); } .logo .c { background:var(--cir); } .logo .x { background:var(--xis); } .logo .q { background:var(--qua); }
-  h1 { margin:0; font-size:17px; font-weight:800; white-space:nowrap; }
+  h1 { margin:0; font-size:16px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   h1 small { color:var(--fraco); font-weight:500; font-size:12px; }
-  .espaco { margin-left:auto; min-width:120px; font-size:12px; color:var(--fraco); text-align:right; }
+  #musica { display:flex; align-items:center; gap:4px; margin-left:auto; font-size:12px; color:var(--fraco); flex-shrink:0; }
+  #musica[hidden] { display:none; }
+  #musica button { min-width:30px; height:30px; border-radius:8px; border:1px solid var(--borda); background:var(--vidro);
+                   color:var(--texto); font-size:13px; cursor:pointer; }
+  #musica #mtit { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 4px; }
+  #musica.desligada #mtit { opacity:.5; text-decoration:line-through; }
+  #musica:not([hidden]) + .espaco { margin-left:8px; }
+  .espaco { margin-left:auto; min-width:120px; max-width:230px; font-size:11.5px; color:var(--fraco); text-align:right; flex-shrink:0;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .espaco .barra { height:6px; border-radius:3px; background:rgba(255,255,255,0.11); overflow:hidden; margin-top:3px; }
   .espaco .barra div { height:100%; background:linear-gradient(90deg, var(--verde), var(--amarelo), var(--vermelho)); }
-  nav { display:flex; gap:6px; padding:8px 12px 2px; overflow-x:auto; scrollbar-width:none; }
+  /* Abas: uma só fileira que desliza (o PS2 tem 640 px de tela, 427 px de CSS) — o cursor/foco puxa a fileira
+     para o centro e as abas escondidas aparecem, sem segunda linha comendo a vitrine. A marcação da aba ativa
+     é uma pílula que desliza para o botão (transform: só o compositor, sem repintar). */
+  nav { display:flex; gap:5px; padding:6px 12px 2px; overflow-x:auto; scrollbar-width:none;
+        scroll-behavior:smooth; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; position:relative; }
+  nav::-webkit-scrollbar { display:none; }
+  #pilula { position:absolute; top:6px; left:0; height:28px; width:0; border-radius:999px; background:var(--azul);
+            opacity:0; pointer-events:none; z-index:0;
+            transition:transform .2s cubic-bezier(.2,.7,.3,1), width .2s cubic-bezier(.2,.7,.3,1), opacity .15s; }
   nav button, .btn { font:inherit; color:var(--texto); background:var(--vidro); border:1px solid var(--borda);
-         border-radius:999px; padding:6px 13px; cursor:pointer; white-space:nowrap; }
-  nav button.ativo { background:var(--azul); border-color:var(--azul); font-weight:700; }
-  nav input { font:inherit; color:var(--texto); background:rgba(0,0,0,0.251); border:1px solid var(--borda); border-radius:999px;
-              padding:6px 12px; min-width:110px; flex:1; }
-  nav input::placeholder { color:var(--fraco); }
+         border-radius:999px; padding:5px 11px; font-size:12px; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+  nav button { position:relative; z-index:1; }
+  nav button.ativo { background:transparent; border-color:var(--azul); font-weight:700; }
+  #linhabusca { padding:5px 12px 2px; }
+  #busca { font:inherit; font-size:12.5px; color:var(--texto); background:rgba(0,0,0,0.251); border:1px solid var(--borda);
+           border-radius:999px; padding:6px 14px; width:100%; }
+  #busca::placeholder { color:var(--fraco); }
   main { padding:10px 12px 70px; }
   .grade { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:12px 10px; }
   .card { position:relative; background:none; border:0; padding:0; color:inherit; font:inherit; text-align:left; cursor:pointer; }
   .capa { aspect-ratio:7/10; border-radius:8px; overflow:hidden; background:#0e1f45 center/cover no-repeat;
-          border:2px solid transparent; box-shadow:0 6px 16px rgba(0,0,0,0.533); display:flex; align-items:flex-end; }
-  .card:hover .capa, .card:focus .capa { border-color:#fff; }
+          border:2px solid transparent; box-shadow:0 6px 16px rgba(0,0,0,0.533); display:flex; align-items:flex-end;
+          transition:transform .12s ease; }
+  .card:hover .capa, .card:focus .capa { border-color:#fff; transform:scale(1.05); }
+  /* entrada em cascata: os cards nascem de baixo, um atrás do outro, quando a aba muda */
+  @keyframes entrada { from { opacity:0; transform:translateY(9px) } to { opacity:1; transform:none } }
+  .card.entra { animation:entrada .22s cubic-bezier(.2,.7,.3,1) both; }
+  /* selo respirando enquanto copia/baixa */
+  .selo.baixando { animation:pulso .9s ease-in-out infinite alternate; }
+  @keyframes pulso { from { opacity:.6 } to { opacity:1 } }
   /* WebView 74 da TV box (navegador do PS2) não tem aspect-ratio nem min(): alturas fixas no lugar */
   @supports not (aspect-ratio: 1 / 1) { .capa { height:134px; } .detalhe .capa { height:171px; } }
   .semcapa { width:100%; height:100%; display:flex; flex-direction:column; justify-content:flex-end; padding:8px;
@@ -57,17 +84,22 @@
   .mini { position:absolute; left:6px; right:6px; bottom:30px; height:5px; border-radius:3px; background:rgba(0,0,0,0.6); overflow:hidden; }
   .mini div { height:100%; background:var(--amarelo); }
   .vazio { color:var(--fraco); text-align:center; padding:30px 0; }
-  /* detalhe */
-  .veu { position:fixed; top:0; right:0; bottom:0; left:0; z-index:10; background:rgba(2,8,20,0.851); display:none; align-items:center; justify-content:center; padding:10px; }
-  .veu.aberto { display:flex; }
+  /* detalhe: o véu desvanece e o painel sobe do chão; ao fechar, o inverso mais rápido */
+  .veu { position:fixed; top:0; right:0; bottom:0; left:0; z-index:10; background:rgba(2,8,20,0.851); display:flex; align-items:center; justify-content:center; padding:10px;
+         opacity:0; pointer-events:none; transition:opacity .12s ease; }
+  .veu.aberto { opacity:1; pointer-events:auto; }
   .detalhe { width:560px; max-width:100%; width:min(560px, 100%); max-height:100%; overflow:auto; display:grid; grid-template-columns:120px 1fr; gap:14px;
-             background:linear-gradient(160deg, rgba(19,48,111,0.933), rgba(7,21,51,0.949)); border:1px solid var(--borda); border-radius:14px; padding:14px; }
+             background:linear-gradient(160deg, rgba(19,48,111,0.933), rgba(7,21,51,0.949)); border:1px solid var(--borda); border-radius:14px; padding:14px;
+             transform:translateY(16px); transition:transform .18s cubic-bezier(.2,.7,.3,1); }
+  .veu:not(.aberto) .detalhe { transition-duration:.1s; }
+  .veu.aberto .detalhe { transform:none; }
   .detalhe .capa { box-shadow:0 10px 30px rgba(0,0,0,0.667); }
   .detalhe h2 { margin:0 0 4px; font-size:18px; line-height:1.15; }
   .linhas { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:12.5px; margin:8px 0 10px; }
   .linhas span:nth-child(odd) { color:var(--fraco); }
   .acoes { display:flex; flex-wrap:wrap; gap:8px; }
-  .btn { border-radius:10px; padding:9px 14px; font-weight:700; }
+  .btn { border-radius:10px; padding:9px 14px; font-weight:700; transition:transform .1s ease; }
+  .btn:active { transform:scale(.96); }
   .btn.prim { background:var(--azul); border-color:var(--azul); }
   .btn.verde { background:#1c9c58; border-color:#1c9c58; }
   .btn.perigo { background:rgba(255,255,255,0.063); border-color:var(--vermelho); color:#ffc7cd; }
@@ -87,10 +119,11 @@
   .dica { position:fixed; right:12px; bottom:8px; font-size:11px; color:var(--fraco); }
   .downloads.ativo ~ .dica { display:none; }
   @media (max-width:460px) {
-    h1 small, .dica { display:none; }
+    h1 small, .dica, #ps2temp { display:none; }
     .detalhe { grid-template-columns:96px 1fr; gap:10px; padding:10px; }
     .detalhe h2 { font-size:16px; }
     .btn { padding:8px 11px; }
+    .espaco { font-size:10.5px; }
   }
 </style>
 </head>
@@ -98,18 +131,25 @@
 <header>
   <div class="logo"><b class="t">△</b><b class="c">○</b><b class="x">✕</b><b class="q">□</b></div>
   <h1>Loja PS2 <small>jogos do HD 01TERA<span id="ps2temp" hidden style="font-size:12px;margin-left:10px;white-space:nowrap"></span></small></h1>
-  <div class="espaco"><span id="espaco">pendrive —</span><div class="barra"><div id="espbarra" style="width:0"></div></div></div>
+  <div id="musica" hidden title="Música de fundo">
+    <button id="mant" aria-label="Faixa anterior">◀</button><span id="mtit">🎵</span><button id="mprox" aria-label="Próxima faixa">▶</button><button id="mlig" aria-label="Ligar ou desligar a música">🔈</button>
+  </div>
+  <div class="espaco"><span id="espaco">pendrive da TV box —</span><div class="barra"><div id="espbarra" style="width:0"></div></div></div>
 </header>
+<div id="linhabusca"><input id="busca" placeholder="🔍 Buscar jogo…" autocomplete="off"></div>
 <nav id="abas">
+  <span id="pilula"></span>
   <button data-aba="todos" class="ativo">Todos</button>
   <button data-aba="instalados">Instalados</button>
   <button data-aba="disponiveis">Para instalar</button>
   <button data-aba="jogados">Mais jogados</button>
   <button data-aba="novos">Novidades</button>
   <button data-aba="snes">🕹 Super Nintendo</button>
-  <input id="busca" placeholder="🔍 Buscar" autocomplete="off">
+  <button data-aba="online">🌐 Games Online</button>
+  <button id="irconquistas" data-ir="/conquistas" hidden>🏆 Conquistas</button>
 </nav>
 <div id="vitrine" hidden style="margin:0 16px 8px;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,.08);font-size:13px">Vitrine do projeto <a href="https://github.com/RodrigoRosa95/PS2-Henbox" style="color:inherit">PS2 Henbox</a>: só para olhar. Os jogos são da coleção pessoal do autor e não são distribuídos; jogar e baixar funcionam só no PS2, pela TV box.</div>
+<div id="cacheoff" hidden style="margin:0 16px 8px;padding:6px 12px;border-radius:8px;background:rgba(255,183,77,.16);border:1px solid rgba(255,183,77,.4);font-size:13px">⏸ <b>Modo offline</b> — catálogo salvo na TV box em <span id="cacheq"></span>. Olhar funciona; instalar, baixar e jogar em nuvem precisam do notebook no ar.</div>
 <main><div class="grade" id="grade"></div><div class="vazio" id="vazio" hidden>Nenhum jogo aqui.</div></main>
 
 <div class="veu" id="veu">
@@ -143,6 +183,22 @@ if (VITRINE) { document.body.classList.add('vitrine'); document.getElementById('
   document.head.insertAdjacentHTML('beforeend', '<style>body.vitrine #dacoes .btn{display:none}</style>'); }
 let retro = {tipo: 'ra', arquivo: '__retroarch__', nome: 'SNESticle (emulador)', tamanho: 0, capa: 'capas/snes/_retroarch.jpg', pedido: {}, versao: ''};
 
+let primeiro = true;   // na 1ª amostragem os cards entram em cascata; os refrescos de polling ficam quietos
+// 🥁 plim de interface nas trocas de aba (25/10/2026): som pequeno embutido (a WebView toca no transformador da TV
+// box; o PS2 não tem saída de som aqui). Play só no gesto do usuário (a política de autoplay exige).
+let plimAudio = null;
+function toque() { try { if (!plimAudio) plimAudio = new Audio('data:audio/wav;base64,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'); plimAudio.currentTime = 0; plimAudio.play(); } catch (_) {} }
+// pílula da aba ativa: chega ao botão ativo e desliza
+function pecinha() {
+  const b = document.querySelector('#abas button.ativo'), pil = $('pilula');
+  if (!b || !b.offsetWidth) { pil.style.opacity = 0; return; }
+  pil.style.top = b.offsetTop + 'px';
+  pil.style.height = b.offsetHeight + 'px';
+  pil.style.width = b.offsetWidth + 'px';
+  pil.style.transform = `translateX(${b.offsetLeft}px)`;
+  pil.style.opacity = 1;
+}
+window.addEventListener('resize', pecinha);
 function selo(j) {
   if (j.tipo === 'snes' || j.tipo === 'ra') {
     const p = j.pedido || {};
@@ -164,29 +220,41 @@ function capaHtml(j) {
 }
 function lista() {
   const q = $('busca').value.trim().toLowerCase();
-  if (aba === 'snes') {   // passo 1 da aba: o cartão do emulador (SNESticle) vem primeiro
-    const lista = roms.filter(j => !q || j.nome.toLowerCase().includes(q));
+  const porNome = (a, b) => a.nome.localeCompare(b.nome, 'pt-BR', {sensitivity:'base'});
+  if (aba === 'snes') {   // passo 1 da aba: o cartão do emulador (SNESticle) vem primeiro, o resto em ordem alfabética
+    const lista = roms.filter(j => !q || j.nome.toLowerCase().includes(q)).sort(porNome);
     return q ? lista : [retro, ...lista];
   }
+  if (aba === 'online') {   // 🌐 jogos dos grupos de WhatsApp (ISO + VMC), nomes oficiais; DNS do anúncio no rodapé
+    return (dados.online || []).filter(j => !q || j.nome.toLowerCase().includes(q) || (j.id || '').toLowerCase().includes(q)).sort(porNome);
+  }
   let js = dados.jogos.filter(j => !q || j.nome.toLowerCase().includes(q) || j.id.toLowerCase().includes(q));
-  if (aba === 'instalados') js = js.filter(j => j.instalado);
-  if (aba === 'disponiveis') js = js.filter(j => !j.instalado);
-  if (aba === 'jogados') js = js.filter(j => j.jogado_s > 0).sort((a, b) => b.jogado_s - a.jogado_s);
-  if (aba === 'novos') js = js.filter(j => j.novo).sort((a, b) => b.novo - a.novo).slice(0, 12);
+  if (aba === 'instalados') js = js.filter(j => j.instalado).sort(porNome);
+  else if (aba === 'disponiveis') js = js.filter(j => !j.instalado).sort(porNome);
+  else if (aba === 'jogados') js = js.filter(j => j.jogado_s > 0).sort(porNome);   // Mais jogados: alfabética também (pedido 24/10)
+  else if (aba === 'novos') js = js.filter(j => j.novo).sort((a, b) => b.novo - a.novo).slice(0, 12);
+  else js.sort(porNome);
   return js;
 }
-function desenhar() {
+function desenhar(animar) {
   const js = lista();
   $('grade').innerHTML = js.map(j => `
     <button class="card" data-arq="${esc(j.arquivo)}">
       ${selo(j)}${capaHtml(j)}
       ${(j.estado && j.estado.fase === 'copiando') ? `<div class="mini"><div style="width:${j.estado.feito/j.estado.total*100}%"></div></div>` : ''}
       <div class="nome">${esc(j.nome)}</div>
-      <div class="info">${gb(j.tamanho)}${j.jogado_s ? ' · ' + hm(j.jogado_s) : ''}</div>
+      <div class="info">${gb(j.tamanho)}${j.jogado_s ? ' · ' + hm(j.jogado_s) : ''}${j.dns ? ' · 🌐 ' + esc(j.dns) : ''}</div>
     </button>`).join('');
+  if (animar) {   // entrada em cascata só quando a aba muda (o polling de instalção não reanima)
+    Array.from($('grade').children).forEach((el, i) => { el.style.animationDelay = Math.min(i, 24) * 15 + 'ms'; el.classList.add('entra'); });
+  }
+  pecinha();
   $('vazio').hidden = js.length > 0;
   const usado = dados.total - dados.livre;
-  $('espaco').textContent = `pendrive: ${gb(dados.livre)} livres`;
+  // o que a box copiou para o pendrive do PS2 (só pela TV box); registro antigo sem tam usa o tamanho do catálogo
+  const ps2 = Object.entries(dados.ps2 || {}).map(([arq, x]) => ({tam: x.tam || ((dados.jogos.find(j => j.arquivo === arq) || {}).tamanho || 0)}));
+  $('espaco').textContent = `pendrive da TV box: ${dados.box === false ? 'sem resposta (offline)' : gb(dados.livre) + ' livres'}` +
+    (ps2.length ? ` · pendrive do PS2: ${ps2.length} jogo${ps2.length > 1 ? 's' : ''} (${gb(ps2.reduce((a, x) => a + (x.tam || 0), 0))})` : '');
   $('espbarra').style.width = (dados.total ? usado / dados.total * 100 : 0) + '%';
   const ativo = dados.jogos.find(j => j.estado && (j.estado.fase === 'copiando' || j.estado.fase === 'conferindo'));
   const falhou = !ativo && dados.jogos.find(j => j.estado && j.estado.fase === 'erro' && Date.now() / 1000 - j.estado.t < 600);
@@ -205,6 +273,40 @@ function desenhar() {
   }
   if (aberto) detalhe(aberto, true);
 }
+function detalheOnline(j, manterMsg) {   // 🌐 ficha de "Games Online" (25/10/2026): 1 clique instala ISO + prepara VMC
+  $('dcapa').outerHTML = capaHtml(j).replace('class="capa"', 'class="capa" id="dcapa"');
+  $('dnome').textContent = j.nome;
+  const e = (dados.jogos.find(x => x.arquivo === j.arquivo) || {}).estado || {};
+  const ocupado = ['fila', 'copiando', 'conferindo'].includes(e.fase);
+  $('dlinhas').innerHTML = [
+    ['Código', j.serial || j.id || '—'], ['Tipo', '🌐 jogo online (anúncio de grupo)'],
+    ['Tamanho', gb(j.tamanho)], ['DNS', j.dns || 'o VMC do evento traz o dele'],
+    ['VMC', j.vmc ? (j.kit ? 'kit ' + j.kit + ' (aplicar na Central)' : 'vmc/' + (j.serial || j.id) + '.ps2') : 'o anúncio não veio com VMC'],
+    ['Onde', j.instalado ? 'pendrive da TV box (jogue pelo OPL)' : (j.existe === false ? 'arquivo não achado na pasta online' : 'HD do notebook (Games Online)')],
+  ].map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('');
+  let b = '';
+  if (j.instalado) {
+    b += `<button class="btn verde" data-faz="jogar" ${j.serial ? '' : 'disabled'}>▶ Jogar do pendrive da TV box</button>`
+      + `<span class="info" style="flex-basis:100%">🌐 O VMC com o DNS do evento ${j.vmc ? 'vai junto (Kits → aplicar na Central, uma vez só)' : 'não veio no anúncio — busque o VMC do jogo num grupo do evento'}</span>`;
+  } else if (ocupado) {
+    b += `<button class="btn" data-faz="cancelar">✕ Cancelar</button>`;
+  } else {
+    b += `<button class="btn prim" data-faz="onlineinstalar">📥 Instalar e preparar online</button>
+          <span class="info" style="flex-basis:100%">1 clique: ISO na fila ${j.vmc ? '+ kit do VMC já fica aprovado' : '(sem VMC no anúncio)'} · apareça na aba Instalados quando terminar</span>`;
+  }
+  $('dacoes').innerHTML = b;
+  $('dprog').hidden = !(e.fase === 'copiando' || e.fase === 'conferindo');
+  if (!$('dprog').hidden) {
+    $('dprogtxt').textContent = e.fase === 'conferindo' ? 'Conferindo a cópia (MD5)…'
+      : `${gb(e.feito)} de ${gb(e.total)} · ${(e.vel/1048576).toFixed(1)} MB/s`;
+    $('dprogbarra').style.width = (e.feito / e.total * 100) + '%';
+  }
+  if (e.fase === 'erro') $('dmsg').textContent = '⚠ ' + e.msg;
+  else if (e.fase === 'pronto') $('dmsg').textContent = '✔ Instalado + VMC pronto: abra pelo OPL do PS2. 🌐';
+  else if (!manterMsg) $('dmsg').textContent = '';
+  $('veu').classList.add('aberto');
+}
+
 function detalheSnes(j, manterMsg) {
   const p = j.pedido || {}, ocupado = !!p.andamento;
   $('dcapa').outerHTML = capaHtml(j).replace('class="capa"', 'class="capa" id="dcapa"');
@@ -213,7 +315,7 @@ function detalheSnes(j, manterMsg) {
     ['No pendrive do PS2', 'SNES/ + SNESticle em APPS/SNESTICLE'], ['Emulador', 'SNESticle Revive']]
     .map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('');
   $('dacoes').innerHTML =
-    `<button class="btn prim" data-faz="snes" ${navegadorAberto && !ocupado ? '' : 'disabled'}>⬇ Baixar no pendrive do PS2</button>` +
+    `<button class="btn prim" data-faz="snes" ${navegadorAberto && !ocupado ? '' : 'disabled'}>🎮 Instalar no pendrive USB do PS2</button>` +
     `<button class="btn verde" data-faz="snesjogar" ${!ocupado ? '' : 'disabled'}>▶ Jogar</button>` +
     (navegadorAberto ? '' : '<span class="info" style="align-self:center">para baixar, abra a loja no PS2 com um pendrive na USB</span>');
   $('dprog').hidden = !ocupado;
@@ -240,8 +342,8 @@ function detalheRetro(manterMsg) {
     ['Passos', '1 instalar · 2 baixar jogos · 3 ▶ Jogar']]
     .map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('');
   $('dacoes').innerHTML =
-    `<button class="btn prim" data-faz="rainstalar" ${navegadorAberto && !ocupado ? '' : 'disabled'}>⬇ Instalar no pendrive do PS2</button>` +
-    `<button class="btn prim" data-faz="ratvbox" ${!ocupado ? '' : 'disabled'}>📺 ${retro.na_tvbox ? 'Reinstalar' : 'Instalar'} na TV box</button>` +
+    `<button class="btn prim" data-faz="rainstalar" ${navegadorAberto && !ocupado ? '' : 'disabled'}>🎮 Instalar no pendrive USB do PS2</button>` +
+    `<button class="btn prim" data-faz="ratvbox" ${!ocupado ? '' : 'disabled'}>📺 ${retro.na_tvbox ? 'Reinstalar' : 'Instalar'} no pendrive da TV box</button>` +
     (navegadorAberto ? '' : '<span class="info" style="align-self:center">para instalar, abra a loja no PS2 com um pendrive na USB</span>');
   $('dprog').hidden = !ocupado;
   if (ocupado) { $('dprogtxt').textContent = `Instalando no pendrive do PS2… ${p.pct || 0}%`; $('dprogbarra').style.width = (p.pct || 0) + '%'; }
@@ -254,35 +356,45 @@ function detalhe(arq, manterMsg) {
   if (arq === '__retroarch__') { aberto = arq; return detalheRetro(manterMsg); }
   const r = roms.find(x => x.arquivo === arq);
   if (r) { aberto = arq; return detalheSnes(r, manterMsg); }
+  const o = (dados.online || []).find(x => x.arquivo === arq);
+  if (o) { aberto = arq; return detalheOnline(o, manterMsg); }
   const j = dados.jogos.find(x => x.arquivo === arq); if (!j) return;
   aberto = arq;
   const e = j.estado || {};
+  const noPs2 = !!(dados.ps2 || {})[j.arquivo];
+  const minUsb = Math.ceil(j.tamanho / 1048576 / 60);   // USB 1.1 do PS2: ~1 MB/s
+  const btnPs2 = `<button class="btn" data-faz="copiarra" title="Grava no pendrive USB do próprio PS2 (USB 1.1: ~1 MB/s); precisa para conquistas e jogo online">🎮 ${noPs2 ? 'Reinstalar' : 'Instalar'} no pendrive USB do PS2 (~${minUsb} min)</button>`;
   $('dcapa').outerHTML = capaHtml(j).replace('class="capa"', 'class="capa" id="dcapa"');
   $('dnome').textContent = j.nome;
   $('dlinhas').innerHTML = [
     ['Código', j.id || '—'], ['Região', j.regiao], ['Tamanho', gb(j.tamanho)],
     ['Jogado', j.jogado_s ? hm(j.jogado_s) : 'nunca'],
-    ['Onde', j.so_pendrive ? 'só no pendrive' : (j.instalado ? 'pendrive + 01TERA' : 'HD 01TERA')],
+    ['Onde', (j.so_pendrive ? 'só no pendrive da TV box' : (j.instalado ? 'pendrive da TV box + HD 01TERA' : 'HD 01TERA (notebook)'))
+      + (noPs2 ? ' + pendrive do PS2' : '')],
   ].map(([a, b]) => `<span>${a}</span><span>${esc(b)}</span>`).join('');
   const ocupado = ['fila', 'copiando', 'conferindo'].includes(e.fase);
   let b = '';
   if (j.instalado) {
-    b += `<button class="btn verde" data-faz="jogar" ${j.id ? '' : 'disabled'}>▶ Jogar</button>`;
+    b += `<button class="btn verde" data-faz="jogar" ${j.id ? '' : 'disabled'}>▶ Jogar do pendrive da TV box</button>`;
     // 🏆 RetroAchievements (xeRAbora) pelo navegador do PS2: OPL-RA abre o jogo do pendrive da box pelo Samba
     // o jogo precisa estar no pendrive do PRÓPRIO PS2 (pelo Samba o xeRAbora ainda não funciona): copiar uma vez
-    if (location.port === '8780' && j.id) b += `<button class="btn verde" data-faz="jogarra">🏆 Jogar com conquistas</button>`
-      + `<button class="btn" data-faz="copiarra" title="O xeRAbora só funciona com o jogo no pendrive do PS2 (USB 1.1: ~1 MB/s)">⬇ Copiar para o PS2</button>`
-      + `<button class="btn" data-faz="prepararra" title="Busca a lista de conquistas no xeRAbora e grava no pendrive do PS2 (o Copiar já faz isso)">🏆 Preparar conquistas</button>`;
-    if (!j.so_pendrive) b += `<button class="btn perigo ${armado === arq ? 'armado' : ''}" data-faz="desinstalar">${armado === arq ? '🗑 Confirmar?' : '🗑 Desinstalar'}</button>`;
+    if (location.port === '8780' && j.id) b += `<button class="btn verde" data-faz="jogarra" title="Abre do pendrive USB do PS2: instale lá antes">🏆 Jogar com conquistas (pendrive do PS2)</button>`
+      + btnPs2
+      + `<button class="btn" data-faz="prepararra" title="Busca a lista de conquistas no xeRAbora e grava no pendrive do PS2 (o Instalar no pendrive do PS2 já faz isso)">🏆 Preparar conquistas</button>`;
+    if (!j.so_pendrive) b += `<button class="btn perigo ${armado === arq ? 'armado' : ''}" data-faz="desinstalar">${armado === arq ? '🗑 Confirmar?' : '🗑 Desinstalar da TV box'}</button>`;
   } else if (ocupado) {
     b += `<button class="btn" data-faz="cancelar">✕ Cancelar</button>`;
   } else {
     // aberta pela TV box (videos.py, porta 8780): o ISO pode rodar direto do HD do notebook (udpfs_nuvem.py)
-    if (location.port === '8780' && j.id) b += `<button class="btn verde" data-faz="jogar">☁ Jogar pela rede</button>`;
+    if (location.port === '8780' && j.id) b += `<button class="btn verde" data-faz="jogar" title="Roda direto do HD do notebook, sem instalar">☁ Jogar em nuvem</button>`
+      + (noPs2 ? `<button class="btn verde" data-faz="jogarra" title="Abre do pendrive USB do PS2">🏆 Jogar com conquistas (pendrive do PS2)</button>` : '')
+      + (j.cabe_fat32 ? btnPs2 : '');
     const cabe = j.tamanho + 64*1048576 <= dados.livre;
-    b += `<button class="btn prim" data-faz="instalar" ${j.cabe_fat32 ? '' : 'disabled'}>⬇ Instalar (${gb(j.tamanho)})</button>`;
-    if (!cabe && j.cabe_fat32) b += `<span class="info" style="align-self:center">falta ${gb(j.tamanho + 64*1048576 - dados.livre)}: desinstale algum jogo</span>`;
+    b += `<button class="btn prim" data-faz="instalar" ${j.cabe_fat32 ? '' : 'disabled'}>📺 Instalar no pendrive da TV box (${gb(j.tamanho)})</button>`;
+    if (!cabe && j.cabe_fat32) b += `<span class="info" style="align-self:center">falta ${gb(j.tamanho + 64*1048576 - dados.livre)}: desinstale algum jogo da TV box</span>`;
   }
+  if (location.port === '8780' && j.id && !ocupado)   // jogo online: o modo nuvem/Samba toma a placa de rede do PS2
+    b += `<span class="info" style="flex-basis:100%">🌐 Para jogar online, instale no pendrive USB do PS2 e abra de lá.</span>`;
   $('dacoes').innerHTML = b;
   $('dprog').hidden = !(e.fase === 'copiando' || e.fase === 'conferindo');
   if (!$('dprog').hidden) {
@@ -292,7 +404,7 @@ function detalhe(arq, manterMsg) {
   }
   // erro/fim de instalação sempre aparece (antes ficava escondido atrás de "adicionado à fila")
   if (e.fase === 'erro') $('dmsg').textContent = '⚠ ' + e.msg;
-  else if (e.fase === 'pronto') $('dmsg').textContent = '✔ Instalado e conferido.';
+  else if (e.fase === 'pronto') $('dmsg').textContent = '✔ Instalado no pendrive da TV box e conferido.';
   else if (!manterMsg) $('dmsg').textContent = '';
   $('veu').classList.add('aberto');
 }
@@ -300,18 +412,23 @@ function fechar() { aberto = null; armado = null; $('veu').classList.remove('abe
 
 async function carregar() {
   try { dados = await (await fetch('api/loja', {cache:'no-store'})).json(); } catch (e) { return; }
+  const off = $('cacheoff');
+  if (dados.cache && dados.cache.quando) { $('cacheq').textContent = dados.cache.quando; off.hidden = false; }
+  else off.hidden = true;
   try {
     const s = await (await fetch('api/loja/snes', {cache:'no-store'})).json();
     navegadorAberto = s.navegador;
     roms = s.roms.map(r => ({...r, arquivo: 'snes:' + r.arquivo, rom: r.arquivo, tipo: 'snes', id: '', regiao: '—'}));
     retro = {...retro, pedido: s.retroarch.pedido || {}, versao: s.retroarch.versao, tamanho: s.retroarch.tamanho || 0, na_tvbox: !!s.retroarch.na_tvbox};
   } catch (e) {}
-  desenhar();
+  try { const o = await (await fetch('api/online', {cache:'no-store'})).json(); dados.online = (o.online || []).filter(x => x.existe !== false || x.vmc); } catch (e) {}
+  desenhar(primeiro);
+  primeiro = false;
 }
 async function fazer(acao, j) {
   $('dmsg').textContent = 'Enviando…';
   const url = {jogar: 'api/jogar', jogarra: 'api/jogar-ra', menura: 'api/menu-ra', copiarra: 'api/copiar-ra', prepararra: 'api/preparar-ra', snesjogar: 'api/loja/snes/jogar', rainstalar: 'api/loja/snes/retroarch', ratvbox: 'api/loja/snes/tvbox-retroarch',
-               raatualizar: 'api/loja/snes/atualizar-retroarch'}[acao] || 'api/loja/' + acao;
+               raatualizar: 'api/loja/snes/atualizar-retroarch', onlineinstalar: 'api/online/instalar'}[acao] || 'api/loja/' + acao;
   if (acao === 'raatualizar') $('dmsg').textContent = 'Baixando do site oficial do libretro…';
   if (acao === 'ratvbox') $('dmsg').textContent = 'Copiando para o pendrive da TV box…';
   const corpo = (acao === 'jogar' || acao === 'jogarra' || acao === 'menura' || acao === 'copiarra' || acao === 'prepararra') ? {id: j.id} : {arquivo: (acao === 'snes' || acao === 'snesjogar') ? j.rom : j.arquivo};
@@ -323,13 +440,21 @@ async function fazer(acao, j) {
 }
 
 $('grade').addEventListener('click', ev => { const c = ev.target.closest('.card'); if (c) { armado = null; detalhe(c.dataset.arq); } });
+// Fileira de abas que desliza: o cursor chegando numa aba (ou o foco navegando por elas) puxa a fila
+// para o centro — as abas do fim aparecem sem rodinha e sem segunda fileira.
+function centroAba() { if (this.scrollIntoView) this.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'}); }
+document.querySelectorAll('#abas button').forEach(b => { b.addEventListener('mouseenter', centroAba); b.addEventListener('focus', centroAba); });
 $('abas').addEventListener('click', ev => {
   const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.ir) { location.href = b.dataset.ir; return; }   // página 🏆 da TV box (no VNC o menu inicial não abre)
+  if (aba !== b.dataset.aba) toque();   // plim só quando a aba de fato muda
   aba = b.dataset.aba;
   document.querySelectorAll('#abas button').forEach(x => x.classList.toggle('ativo', x === b));
-  desenhar(); scrollTo(0, 0);
+  centroAba.call(b);
+  desenhar(true); scrollTo(0, 0);
 });
-$('busca').addEventListener('input', desenhar);
+if (location.port === '8780') $('irconquistas').hidden = false;
+$('busca').addEventListener('input', () => desenhar());
 $('fechar').addEventListener('click', fechar);
 $('veu').addEventListener('click', ev => { if (ev.target === $('veu')) fechar(); });
 $('dacoes').addEventListener('click', ev => {
@@ -356,7 +481,30 @@ carregar();
              || roms.some(r => r.pedido && r.pedido.andamento) || !!(retro.pedido && retro.pedido.andamento);
   setTimeout(() => carregar().then(ciclo), ativo ? 2000 : 15000);
 })();
+// 🎵 música de fundo (24/10/2026): só aparece na loja servida pela TV box (videos.py /loja/api/musica)
+(function () {
+  const caixa = document.getElementById('musica'), tit = document.getElementById('mtit'), lig = document.getElementById('mlig');
+  function mostrar(e) {
+    if (!e || e.erro || !e.total) { caixa.hidden = true; return; }
+    caixa.hidden = false;
+    caixa.classList.toggle('desligada', !e.ligada);
+    lig.textContent = e.ligada ? '🔈' : '🔇';
+    const f = e.faixa;
+    tit.textContent = f ? `🎵 ${f.titulo} (${e.posicao}/${e.total})` : '🎵 música';
+    caixa.title = f ? `${f.titulo} — ${f.credito}` : 'Música de fundo';
+  }
+  async function pedir(acao) {
+    try { mostrar(await (await fetch('api/musica?acao=' + acao, {cache:'no-store'})).json()); } catch (e) { caixa.hidden = true; }
+  }
+  document.getElementById('mant').onclick = () => pedir('anterior');
+  document.getElementById('mprox').onclick = () => pedir('proxima');
+  lig.onclick = () => pedir(caixa.classList.contains('desligada') ? 'ligar' : 'desligar');
+  pedir('estado');
+  // troca automática a cada 10 s (o PS2 troca sozinho): o rótulo acompanha lendo o estado uma vez por troca
+  setInterval(() => { if (!caixa.hidden) pedir('estado'); }, 10000);
+})();
 </script>
-<script src="temperatura.js"></script>
+<script src="temperatura.js">
+</script>
 </body>
 </html>

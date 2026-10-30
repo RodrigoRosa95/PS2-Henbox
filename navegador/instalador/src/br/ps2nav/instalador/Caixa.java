@@ -235,7 +235,7 @@ public class Caixa {
     /** Para os servidores pelo PID (o pkill -f do Termux não alcança os processos e um padrão na mesma linha mataria
      *  o próprio comando); o udpfs-ps2.sh e o iniciar.sh sobem tudo de novo. */
     void pararServicos() throws IOException {
-        su("for p in $(ps -A -o PID,ARGS | grep -E '[s]ervidor_host.py|[n]avegador_servidor.py|[v]ideos.py 8780|[u]dpfs_nuvem.py'"
+        su("for p in $(ps -A -o PID,ARGS | grep -E '[s]ervidor_host.py|[n]avegador_servidor.py|[v]ideos.py 8780|[u]dpfs_nuvem.py|[c]entral.py'"
                 + " | awk '{print $1}'); do kill $p; done");
     }
 
@@ -280,6 +280,64 @@ public class Caixa {
     String[] pendrives() throws IOException {
         String r = su("sh " + H + "/ps2nav/preparar-pendrive.sh listar 2>&1").trim();
         return r.length() == 0 ? new String[0] : r.split("\n");
+    }
+
+    // ---- 🎵 música da loja: o usuário envia do celular e cai na pasta MUSICAS do pendrive da box (24/10/2026) ----
+    /** Formatos que a videos.py da box sabe converter para o som do PS2 (MUSICAS_EXT de videos.py). */
+    static final String[] MUSICAS_EXT = {".mp3", ".ogg", ".wav", ".flac", ".m4a", ".opus"};
+
+    boolean musicaConhecida(String nome) {
+        String b = nome.toLowerCase();
+        for (String e : MUSICAS_EXT) if (b.endsWith(e)) return true;
+        return false;
+    }
+
+    /** Pasta MUSICAS do pendrive em /storage da box (a que a videos.py procura); cria se ainda não existe. */
+    String pastaMusicas() throws IOException {
+        String p = sh("ls -d /storage/*-*/MUSICAS 2>/dev/null | head -1").trim();
+        if (p.isEmpty()) {
+            String raiz = sh("ls -d /storage/* 2>/dev/null | grep -vw /storage/self | head -1").trim();
+            if (raiz.isEmpty()) throw new IOException("nenhum pendrive na USB da TV box. Espete um com a pasta MUSICAS e tente de novo.");
+            p = raiz + "/MUSICAS";
+            String r = su("mkdir -p " + aspas(p) + " && echo ok");
+            if (!r.trim().endsWith("ok")) throw new IOException("não criei a pasta MUSICAS: " + r.trim());
+        }
+        return p;
+    }
+
+    /** Envio completo: o arquivo vai por ADB para /data/local/tmp e um cp como root o põe no pendrive
+     *  (o Termux da box não escreve no FAT32, o root sim). Devolve o caminho no pendrive. */
+    String enviarMusica(String nome, InputStream dados) throws IOException {
+        final String limpo = nomeLimpo(nome);
+        String pasta = pastaMusicas();
+        String cheio = pasta + "/" + limpo;
+        String tmp = "/data/local/tmp/henbox-musica" + Long.toString(System.currentTimeMillis(), 36);
+        try {
+            adb.enviarArquivo(dados, tmp, 0644, null);
+            String r = su("cp " + aspas(tmp) + " " + aspas(cheio) + " && chmod 660 " + aspas(cheio)
+                    + " && echo copiei-ok; rm -f " + aspas(tmp));
+            if (!r.trim().endsWith("copiei-ok"))
+                throw new IOException("não copiei para o pendrive da TV box: " + resumo(r));
+        } finally {
+            su("rm -f " + aspas(tmp) + " 2>/dev/null");
+        }
+        return cheio;
+    }
+
+    String nomeLimpo(String nome) throws IOException {
+        if (nome == null || nome.trim().isEmpty()) throw new IOException("nome vazio");
+        String b = nome.replace('\\', '/');
+        b = b.substring(b.lastIndexOf('/') + 1);
+        b = b.replaceAll("[\\x00-\\x1f\\x7f/:*?\"<>|]", "_").trim();
+        if (!musicaConhecida(b))
+            throw new IOException("formato não suportado (" + nome + "): use "
+                    + android.text.TextUtils.join(", ", MUSICAS_EXT));
+        return b;
+    }
+
+    String resumo(String r) {
+        String s = r.replace('\n', ' ').trim();
+        return s.length() > 200 ? s.substring(s.length() - 200) : s;
     }
 
     String prepararPendrive(String id, boolean formatar) throws IOException {

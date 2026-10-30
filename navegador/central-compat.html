@@ -1,0 +1,2135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Central PS2 Henbox</title>
+<!-- Central do celular (24/10/2026): servida pelo central.py da TV box (porta 8785). No app PS2 Henbox, window.Henbox
+     liga o servidor de ISOs do celular e devolve o endereço; num navegador comum, tudo menos a aba do celular. -->
+<style>
+:root{--fundo:#0b1630;--cartao:#132a57;--borda:#24407a;--texto:#fff;--fraco:#9fb4e0;--azul:#3466c8;--verde:#3fb950;
+--amarelo:#ffd166;--vermelho:#f85149}
+*{box-sizing:border-box}
+body{margin:0;background:#0b1630;color:#fff;font:16px system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+header{position:sticky;top:0;background:#0e1d40;z-index:5;border-bottom:1px solid #24407a}
+header h1{margin:0;padding:10px 16px 4px;font-size:19px}
+#status{padding:0 16px 8px;color:#9fb4e0;font-size:13px}
+nav{display:flex;overflow-x:auto}
+nav button{flex:1;min-width:76px;background:none;border:0;color:#9fb4e0;padding:10px 4px;font-size:14px;border-bottom:3px solid transparent}
+nav button.ativo{color:#fff;border-color:#ffd166}
+main{padding:12px 16px 120px}
+section{display:none}section.ativo{display:block}
+h2{font-size:17px;margin:16px 0 8px}
+.b{background:#3466c8;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-size:15px;margin:3px 4px 3px 0}
+.b.s{background:#24407a;padding:7px 10px;font-size:13px}.b.v{background:#2d7a3e}.b.r{background:#8a2a26}
+.b:disabled{opacity:.45}
+.grade{display:flex;flex-wrap:wrap;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.jogo{background:#132a57;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.jogo img,.jogo .semcapa{width:100%;aspect-ratio:140/200;object-fit:cover;background:#1d3b78;display:flex;align-items:center;
+justify-content:center;color:#9fb4e0;font-size:12px;text-align:center}
+.jogo .i{padding:8px;font-size:13px;flex:1;display:flex;flex-direction:column;gap:4px}
+.jogo .t{font-weight:600;font-size:14px;word-break:break-word}.jogo .c{color:#9fb4e0;font-size:12px}
+.cartao{background:#132a57;border-radius:12px;padding:12px;margin:0 0 10px}
+.cartao .t{font-weight:600;font-size:16px}.p{color:#9fb4e0;font-size:13px}
+.lista .it{display:flex;align-items:center;gap:8px;padding:10px 6px;border-bottom:1px solid #1d3b78}
+.lista .it .n{flex:1;word-break:break-all}.lista .it .z{color:#9fb4e0;font-size:12px;white-space:nowrap}
+.lista .it.pasta .n{color:#ffd166}
+select,input,textarea{width:100%;background:#0e1d40;color:#fff;border:1px solid #24407a;border-radius:8px;padding:9px;font-size:15px;margin:3px 0 8px}
+label{font-size:13px;color:#9fb4e0}
+#pad{height:46vh;min-height:240px;background:#0e1d40;border:2px dashed #24407a;border-radius:16px;touch-action:none;
+display:flex;align-items:center;justify-content:center;color:#9fb4e0;text-align:center;user-select:none}
+.botoes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.botoes .b{margin:0;padding:12px 4px}
+#tarefas{position:fixed;left:0;right:0;bottom:0;background:#0e1d40;border-top:1px solid #24407a;max-height:30vh;overflow:auto;z-index:6}
+#tarefas .tf{padding:8px 16px;font-size:13px;border-bottom:1px solid #1d3b78}
+.barra{height:5px;background:#24407a;border-radius:3px;margin-top:4px}.barra i{display:block;height:100%;background:#3466c8;border-radius:3px}
+.tf.pronto .barra i{background:#3fb950}.tf.erro{color:#f85149}
+.aviso{background:#3b2f0d;border-left:4px solid #ffd166;padding:9px 12px;border-radius:8px;font-size:14px;margin:8px 0}
+.ok{color:#3fb950}.nao{color:#f85149}
+#msg{position:fixed;left:16px;right:16px;bottom:16px;background:#1d3b78;padding:12px;border-radius:10px;display:none;z-index:9}
+.grade>.jogo{width:150px;margin:0 10px 10px 0}@supports (display:grid){.grade>.jogo{width:auto;margin:0}}.jogo img,.jogo .semcapa{height:214px}@supports (aspect-ratio:1){.jogo img,.jogo .semcapa{height:auto}}</style>
+</head>
+<body>
+<header>
+  <h1>🎮 Central PS2 Henbox</h1>
+  <div id="status">conectando na TV box…</div>
+  <nav>
+    <button data-aba="jogos" class="ativo">🎮 Jogos</button>
+    <button data-aba="online">🌐 Online</button>
+    <button data-aba="arquivos">📁 Arquivos</button>
+    <button data-aba="controle">🖱 Controle</button>
+  </nav>
+</header>
+<main>
+<section id="jogos" class="ativo">
+  <div class="cartao">🏆 <b>Sua conta do RetroAchievements</b> — para conquistar na tua conta: no app PS2 Henbox toque <b>Instalar conquistas na TV box</b>; o xeRAbora abre e você digita teu usuário e senha (uma vez só, deixa "OPEN TO THE NETWORK" ligado). O painel 🏆 e as medalhas passam a ser SEMPRE da conta que estiver logada no xeRAbora da box — cada box instalada tem a login dela, independente.</div>
+  <h2>💾 Pendrive da TV box</h2>
+  <button class="b" onclick="baixarCapas()">🖼 Baixar capas que faltam</button>
+  <div class="p">Capas no padrão do OPL (ART/&lt;código&gt;_COV.jpg, 140×200), do acervo xlenore/ps2-covers.</div>
+  <div id="jogosBox" class="grade" style="margin-top:10px"></div>
+  <h2>📱 Neste celular</h2>
+  <div id="celInfo" class="p"></div>
+  <button class="b s" id="btProcurar" onclick="procurarCelular()">🔎 Procurar ISOs no celular</button>
+  <div id="jogosCel" class="grade" style="margin-top:10px"></div>
+</section>
+
+<section id="online">
+  <h2>🌐 Games Online (do catálogo da loja)</h2>
+  <div id="onlineLivre" class="p"></div>
+  <div id="onlineListaNg" class="grade" style="margin-top:8px"></div>
+  <div class="p" style="margin-top:10px">Clicou em <b>📤 enviar</b> → o ISO entra na fila da loja e sai no pendrive da box já com o DNS do servidor online. E também aparece na aba 🌐 da loja (TV).</div>
+  <h2>📤 Kits para usar online (VMC, patch e DNS)</h2>
+  <div class="aviso">Aqui só circulam <b>kits</b> (VMC, CFG, patch e DNS). O jogo é o ISO do <b>seu</b> disco — no pendrive da box ou no celular.</div></div>
+  <div id="dnsKit"></div>
+  <div id="kits"></div>
+  <h2>📤 Enviar um kit para a comunidade</h2>
+  <div class="cartao">
+    <label>Código do jogo (ex.: SLUS_203.12)</label><input id="kCodigo">
+    <label>Nome do jogo</label><input id="kTitulo">
+    <label>DNS do servidor online (opcional)</label><input id="kDns" placeholder="ex.: 45.7.228.197" inputmode="decimal">
+    <label>Servidor / comunidade</label><input id="kServidor">
+    <label>Seu nome ou apelido</label><input id="kAutor">
+    <label>Como jogar (o que configurar, horários…)</label><textarea id="kNotas" rows="3"></textarea>
+    <label>Versão testada: ISO do pendrive da box (para o hash)</label><select id="kVersao"><option value="">— nenhuma —</option></select>
+    <label>Arquivos: VMC (.bin), CFG (.cfg), patch (.ppf), capa (.jpg/.png)</label><input id="kArquivos" type="file" multiple>
+    <button class="b v" onclick="enviarKit()">📤 Enviar para aprovação</button>
+  </div>
+</section>
+
+<section id="arquivos">
+  <label>Onde</label>
+  <select id="fonte" onchange="abrir(raizDe(this.value))">
+    <option value="box">💾 Pendrive da TV box</option>
+    <option value="mc0:/">🟦 Memory card 1 (mc0:)</option>
+    <option value="mc1:/">🟦 Memory card 2 (mc1:)</option>
+    <option value="mass:/">🔌 Pendrive no PS2 (mass:)</option>
+  </select>
+  <div class="p" id="fonteInfo"></div>
+  <div style="margin:8px 0"><b id="caminho">/</b></div>
+  <button class="b s" onclick="subir()">⬆ Voltar pasta</button>
+  <button class="b s" onclick="novaPasta()">➕ Nova pasta</button>
+  <button class="b s" onclick="document.getElementById('envio').click()">📤 Enviar arquivo aqui</button>
+  <button class="b s" onclick="abrir(atual)">🔄</button>
+  <input id="envio" type="file" style="display:none" onchange="enviarArquivo(this)">
+  <div id="lista" class="lista"></div>
+</section>
+
+<section id="controle">
+  <div id="pad">Arraste para mover o cursor da TV<br>toque = clique · dois dedos = rolar</div>
+  <div class="botoes">
+    <button class="b" onclick="botao('CIRCULO')">⭕ Voltar</button>
+    <button class="b" onclick="botao('TRIANGULO')">🔺 Recarregar</button>
+    <button class="b" onclick="botao('QUADRADO')">⬛ Teclado</button>
+    <button class="b" onclick="botao('START')">🏠 Início</button>
+    <button class="b" onclick="botao('R2')">🛒 Loja</button>
+    <button class="b" onclick="ev({tipo:'rolar',dy:-300})">⏫</button>
+    <button class="b" onclick="ev({tipo:'rolar',dy:300})">⏬</button>
+    <button class="b" onclick="ev({tipo:'clique'})">👆 Clique</button>
+  </div>
+  <h2>⌨ Digitar na TV</h2>
+  <input id="texto" placeholder="escreva e toque em Enviar" autocomplete="off">
+  <button class="b" onclick="digitar()">Enviar</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'enter'})">↵ Enter</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'apagar'})">⌫</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'tab'})">Tab</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'cima'})">↑</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'baixo'})">↓</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'esquerda'})">←</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'direita'})">→</button>
+  <div class="p" style="margin-top:10px">Funciona com o navegador aberto no PS2 (Loja, sistema, vídeos e qualquer página).</div>
+</section>
+</main>
+<div id="tarefas"></div>
+<div id="msg"></div>
+<script>
+if (!Array.prototype.find) Array.prototype.find = function (f) { for (var i = 0; i < this.length; i++) if (f(this[i], i, this)) return this[i]; };
+if (!String.prototype.startsWith) String.prototype.startsWith = function (s) { return this.indexOf(s) === 0; };
+if (!String.prototype.endsWith) String.prototype.endsWith = function (s) { return this.slice(-s.length) === s; };
+if (window.NodeList && !NodeList.prototype.forEach) NodeList.prototype.forEach = Array.prototype.forEach;
+if (window.Blob && !Blob.prototype.arrayBuffer) Blob.prototype.arrayBuffer = function () { var b = this;
+  return new Promise(function (ok, erro) { var r = new FileReader(); r.onload = function () { ok(r.result); }; r.onerror = erro; r.readAsArrayBuffer(b); }); };
+if (!Object.assign) Object.assign = function (a) { for (var i = 1; i < arguments.length; i++) for (var k in arguments[i]) a[k] = arguments[i][k]; return a; };
+if (!window.fetch) window.fetch = function (url, op) { op = op || {};
+  return new Promise(function (ok, erro) { var x = new XMLHttpRequest(); x.open(op.method || 'GET', url);
+    var hs = op.headers || {}; for (var k in hs) x.setRequestHeader(k, hs[k]);
+    x.onload = function () { ok({ok: x.status >= 200 && x.status < 300, status: x.status,
+      json: function () { return new Promise(function (a, b) { try { a(JSON.parse(x.responseText)); } catch (e) { b(e); } }); },
+      text: function () { return Promise.resolve(x.responseText); }}); };
+    x.onerror = function () { erro(new TypeError('falha de rede')); }; x.send(op.body || null); }); };
+/**
+ * Copyright (c) 2014-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+var runtime = (function (exports) {
+  "use strict";
+
+  var Op = Object.prototype;
+  var hasOwn = Op.hasOwnProperty;
+  var defineProperty = Object.defineProperty || function (obj, key, desc) { obj[key] = desc.value; };
+  var undefined; // More compressible than void 0.
+  var $Symbol = typeof Symbol === "function" ? Symbol : {};
+  var iteratorSymbol = $Symbol.iterator || "@@iterator";
+  var asyncIteratorSymbol = $Symbol.asyncIterator || "@@asyncIterator";
+  var toStringTagSymbol = $Symbol.toStringTag || "@@toStringTag";
+
+  function define(obj, key, value) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+    return obj[key];
+  }
+  try {
+    // IE 8 has a broken Object.defineProperty that only works on DOM objects.
+    define({}, "");
+  } catch (err) {
+    define = function(obj, key, value) {
+      return obj[key] = value;
+    };
+  }
+
+  function wrap(innerFn, outerFn, self, tryLocsList) {
+    // If outerFn provided and outerFn.prototype is a Generator, then outerFn.prototype instanceof Generator.
+    var protoGenerator = outerFn && outerFn.prototype instanceof Generator ? outerFn : Generator;
+    var generator = Object.create(protoGenerator.prototype);
+    var context = new Context(tryLocsList || []);
+
+    // The ._invoke method unifies the implementations of the .next,
+    // .throw, and .return methods.
+    defineProperty(generator, "_invoke", { value: makeInvokeMethod(innerFn, self, context) });
+
+    return generator;
+  }
+  exports.wrap = wrap;
+
+  // Try/catch helper to minimize deoptimizations. Returns a completion
+  // record like context.tryEntries[i].completion. This interface could
+  // have been (and was previously) designed to take a closure to be
+  // invoked without arguments, but in all the cases we care about we
+  // already have an existing method we want to call, so there's no need
+  // to create a new function object. We can even get away with assuming
+  // the method takes exactly one argument, since that happens to be true
+  // in every case, so we don't have to touch the arguments object. The
+  // only additional allocation required is the completion record, which
+  // has a stable shape and so hopefully should be cheap to allocate.
+  function tryCatch(fn, obj, arg) {
+    try {
+      return { type: "normal", arg: fn.call(obj, arg) };
+    } catch (err) {
+      return { type: "throw", arg: err };
+    }
+  }
+
+  var GenStateSuspendedStart = "suspendedStart";
+  var GenStateSuspendedYield = "suspendedYield";
+  var GenStateExecuting = "executing";
+  var GenStateCompleted = "completed";
+
+  // Returning this object from the innerFn has the same effect as
+  // breaking out of the dispatch switch statement.
+  var ContinueSentinel = {};
+
+  // Dummy constructor functions that we use as the .constructor and
+  // .constructor.prototype properties for functions that return Generator
+  // objects. For full spec compliance, you may wish to configure your
+  // minifier not to mangle the names of these two functions.
+  function Generator() {}
+  function GeneratorFunction() {}
+  function GeneratorFunctionPrototype() {}
+
+  // This is a polyfill for %IteratorPrototype% for environments that
+  // don't natively support it.
+  var IteratorPrototype = {};
+  define(IteratorPrototype, iteratorSymbol, function () {
+    return this;
+  });
+
+  var getProto = Object.getPrototypeOf;
+  var NativeIteratorPrototype = getProto && getProto(getProto(values([])));
+  if (NativeIteratorPrototype &&
+      NativeIteratorPrototype !== Op &&
+      hasOwn.call(NativeIteratorPrototype, iteratorSymbol)) {
+    // This environment has a native %IteratorPrototype%; use it instead
+    // of the polyfill.
+    IteratorPrototype = NativeIteratorPrototype;
+  }
+
+  var Gp = GeneratorFunctionPrototype.prototype =
+    Generator.prototype = Object.create(IteratorPrototype);
+  GeneratorFunction.prototype = GeneratorFunctionPrototype;
+  defineProperty(Gp, "constructor", { value: GeneratorFunctionPrototype, configurable: true });
+  defineProperty(
+    GeneratorFunctionPrototype,
+    "constructor",
+    { value: GeneratorFunction, configurable: true }
+  );
+  GeneratorFunction.displayName = define(
+    GeneratorFunctionPrototype,
+    toStringTagSymbol,
+    "GeneratorFunction"
+  );
+
+  // Helper for defining the .next, .throw, and .return methods of the
+  // Iterator interface in terms of a single ._invoke method.
+  function defineIteratorMethods(prototype) {
+    ["next", "throw", "return"].forEach(function(method) {
+      define(prototype, method, function(arg) {
+        return this._invoke(method, arg);
+      });
+    });
+  }
+
+  exports.isGeneratorFunction = function(genFun) {
+    var ctor = typeof genFun === "function" && genFun.constructor;
+    return ctor
+      ? ctor === GeneratorFunction ||
+        // For the native GeneratorFunction constructor, the best we can
+        // do is to check its .name property.
+        (ctor.displayName || ctor.name) === "GeneratorFunction"
+      : false;
+  };
+
+  exports.mark = function(genFun) {
+    if (Object.setPrototypeOf) {
+      Object.setPrototypeOf(genFun, GeneratorFunctionPrototype);
+    } else {
+      genFun.__proto__ = GeneratorFunctionPrototype;
+      define(genFun, toStringTagSymbol, "GeneratorFunction");
+    }
+    genFun.prototype = Object.create(Gp);
+    return genFun;
+  };
+
+  // Within the body of any async function, `await x` is transformed to
+  // `yield regeneratorRuntime.awrap(x)`, so that the runtime can test
+  // `hasOwn.call(value, "__await")` to determine if the yielded value is
+  // meant to be awaited.
+  exports.awrap = function(arg) {
+    return { __await: arg };
+  };
+
+  function AsyncIterator(generator, PromiseImpl) {
+    function invoke(method, arg, resolve, reject) {
+      var record = tryCatch(generator[method], generator, arg);
+      if (record.type === "throw") {
+        reject(record.arg);
+      } else {
+        var result = record.arg;
+        var value = result.value;
+        if (value &&
+            typeof value === "object" &&
+            hasOwn.call(value, "__await")) {
+          return PromiseImpl.resolve(value.__await).then(function(value) {
+            invoke("next", value, resolve, reject);
+          }, function(err) {
+            invoke("throw", err, resolve, reject);
+          });
+        }
+
+        return PromiseImpl.resolve(value).then(function(unwrapped) {
+          // When a yielded Promise is resolved, its final value becomes
+          // the .value of the Promise<{value,done}> result for the
+          // current iteration.
+          result.value = unwrapped;
+          resolve(result);
+        }, function(error) {
+          // If a rejected Promise was yielded, throw the rejection back
+          // into the async generator function so it can be handled there.
+          return invoke("throw", error, resolve, reject);
+        });
+      }
+    }
+
+    var previousPromise;
+
+    function enqueue(method, arg) {
+      function callInvokeWithMethodAndArg() {
+        return new PromiseImpl(function(resolve, reject) {
+          invoke(method, arg, resolve, reject);
+        });
+      }
+
+      return previousPromise =
+        // If enqueue has been called before, then we want to wait until
+        // all previous Promises have been resolved before calling invoke,
+        // so that results are always delivered in the correct order. If
+        // enqueue has not been called before, then it is important to
+        // call invoke immediately, without waiting on a callback to fire,
+        // so that the async generator function has the opportunity to do
+        // any necessary setup in a predictable way. This predictability
+        // is why the Promise constructor synchronously invokes its
+        // executor callback, and why async functions synchronously
+        // execute code before the first await. Since we implement simple
+        // async functions in terms of async generators, it is especially
+        // important to get this right, even though it requires care.
+        previousPromise ? previousPromise.then(
+          callInvokeWithMethodAndArg,
+          // Avoid propagating failures to Promises returned by later
+          // invocations of the iterator.
+          callInvokeWithMethodAndArg
+        ) : callInvokeWithMethodAndArg();
+    }
+
+    // Define the unified helper method that is used to implement .next,
+    // .throw, and .return (see defineIteratorMethods).
+    defineProperty(this, "_invoke", { value: enqueue });
+  }
+
+  defineIteratorMethods(AsyncIterator.prototype);
+  define(AsyncIterator.prototype, asyncIteratorSymbol, function () {
+    return this;
+  });
+  exports.AsyncIterator = AsyncIterator;
+
+  // Note that simple async functions are implemented on top of
+  // AsyncIterator objects; they just return a Promise for the value of
+  // the final result produced by the iterator.
+  exports.async = function(innerFn, outerFn, self, tryLocsList, PromiseImpl) {
+    if (PromiseImpl === void 0) PromiseImpl = Promise;
+
+    var iter = new AsyncIterator(
+      wrap(innerFn, outerFn, self, tryLocsList),
+      PromiseImpl
+    );
+
+    return exports.isGeneratorFunction(outerFn)
+      ? iter // If outerFn is a generator, return the full iterator.
+      : iter.next().then(function(result) {
+          return result.done ? result.value : iter.next();
+        });
+  };
+
+  function makeInvokeMethod(innerFn, self, context) {
+    var state = GenStateSuspendedStart;
+
+    return function invoke(method, arg) {
+      if (state === GenStateExecuting) {
+        throw new Error("Generator is already running");
+      }
+
+      if (state === GenStateCompleted) {
+        if (method === "throw") {
+          throw arg;
+        }
+
+        // Be forgiving, per 25.3.3.3.3 of the spec:
+        // https://people.mozilla.org/~jorendorff/es6-draft.html#sec-generatorresume
+        return doneResult();
+      }
+
+      context.method = method;
+      context.arg = arg;
+
+      while (true) {
+        var delegate = context.delegate;
+        if (delegate) {
+          var delegateResult = maybeInvokeDelegate(delegate, context);
+          if (delegateResult) {
+            if (delegateResult === ContinueSentinel) continue;
+            return delegateResult;
+          }
+        }
+
+        if (context.method === "next") {
+          // Setting context._sent for legacy support of Babel's
+          // function.sent implementation.
+          context.sent = context._sent = context.arg;
+
+        } else if (context.method === "throw") {
+          if (state === GenStateSuspendedStart) {
+            state = GenStateCompleted;
+            throw context.arg;
+          }
+
+          context.dispatchException(context.arg);
+
+        } else if (context.method === "return") {
+          context.abrupt("return", context.arg);
+        }
+
+        state = GenStateExecuting;
+
+        var record = tryCatch(innerFn, self, context);
+        if (record.type === "normal") {
+          // If an exception is thrown from innerFn, we leave state ===
+          // GenStateExecuting and loop back for another invocation.
+          state = context.done
+            ? GenStateCompleted
+            : GenStateSuspendedYield;
+
+          if (record.arg === ContinueSentinel) {
+            continue;
+          }
+
+          return {
+            value: record.arg,
+            done: context.done
+          };
+
+        } else if (record.type === "throw") {
+          state = GenStateCompleted;
+          // Dispatch the exception by looping back around to the
+          // context.dispatchException(context.arg) call above.
+          context.method = "throw";
+          context.arg = record.arg;
+        }
+      }
+    };
+  }
+
+  // Call delegate.iterator[context.method](context.arg) and handle the
+  // result, either by returning a { value, done } result from the
+  // delegate iterator, or by modifying context.method and context.arg,
+  // setting context.delegate to null, and returning the ContinueSentinel.
+  function maybeInvokeDelegate(delegate, context) {
+    var methodName = context.method;
+    var method = delegate.iterator[methodName];
+    if (method === undefined) {
+      // A .throw or .return when the delegate iterator has no .throw
+      // method, or a missing .next mehtod, always terminate the
+      // yield* loop.
+      context.delegate = null;
+
+      // Note: ["return"] must be used for ES3 parsing compatibility.
+      if (methodName === "throw" && delegate.iterator["return"]) {
+        // If the delegate iterator has a return method, give it a
+        // chance to clean up.
+        context.method = "return";
+        context.arg = undefined;
+        maybeInvokeDelegate(delegate, context);
+
+        if (context.method === "throw") {
+          // If maybeInvokeDelegate(context) changed context.method from
+          // "return" to "throw", let that override the TypeError below.
+          return ContinueSentinel;
+        }
+      }
+      if (methodName !== "return") {
+        context.method = "throw";
+        context.arg = new TypeError(
+          "The iterator does not provide a '" + methodName + "' method");
+      }
+
+      return ContinueSentinel;
+    }
+
+    var record = tryCatch(method, delegate.iterator, context.arg);
+
+    if (record.type === "throw") {
+      context.method = "throw";
+      context.arg = record.arg;
+      context.delegate = null;
+      return ContinueSentinel;
+    }
+
+    var info = record.arg;
+
+    if (! info) {
+      context.method = "throw";
+      context.arg = new TypeError("iterator result is not an object");
+      context.delegate = null;
+      return ContinueSentinel;
+    }
+
+    if (info.done) {
+      // Assign the result of the finished delegate to the temporary
+      // variable specified by delegate.resultName (see delegateYield).
+      context[delegate.resultName] = info.value;
+
+      // Resume execution at the desired location (see delegateYield).
+      context.next = delegate.nextLoc;
+
+      // If context.method was "throw" but the delegate handled the
+      // exception, let the outer generator proceed normally. If
+      // context.method was "next", forget context.arg since it has been
+      // "consumed" by the delegate iterator. If context.method was
+      // "return", allow the original .return call to continue in the
+      // outer generator.
+      if (context.method !== "return") {
+        context.method = "next";
+        context.arg = undefined;
+      }
+
+    } else {
+      // Re-yield the result returned by the delegate method.
+      return info;
+    }
+
+    // The delegate iterator is finished, so forget it and continue with
+    // the outer generator.
+    context.delegate = null;
+    return ContinueSentinel;
+  }
+
+  // Define Generator.prototype.{next,throw,return} in terms of the
+  // unified ._invoke helper method.
+  defineIteratorMethods(Gp);
+
+  define(Gp, toStringTagSymbol, "Generator");
+
+  // A Generator should always return itself as the iterator object when the
+  // @@iterator function is called on it. Some browsers' implementations of the
+  // iterator prototype chain incorrectly implement this, causing the Generator
+  // object to not be returned from this call. This ensures that doesn't happen.
+  // See https://github.com/facebook/regenerator/issues/274 for more details.
+  define(Gp, iteratorSymbol, function() {
+    return this;
+  });
+
+  define(Gp, "toString", function() {
+    return "[object Generator]";
+  });
+
+  function pushTryEntry(locs) {
+    var entry = { tryLoc: locs[0] };
+
+    if (1 in locs) {
+      entry.catchLoc = locs[1];
+    }
+
+    if (2 in locs) {
+      entry.finallyLoc = locs[2];
+      entry.afterLoc = locs[3];
+    }
+
+    this.tryEntries.push(entry);
+  }
+
+  function resetTryEntry(entry) {
+    var record = entry.completion || {};
+    record.type = "normal";
+    delete record.arg;
+    entry.completion = record;
+  }
+
+  function Context(tryLocsList) {
+    // The root entry object (effectively a try statement without a catch
+    // or a finally block) gives us a place to store values thrown from
+    // locations where there is no enclosing try statement.
+    this.tryEntries = [{ tryLoc: "root" }];
+    tryLocsList.forEach(pushTryEntry, this);
+    this.reset(true);
+  }
+
+  exports.keys = function(val) {
+    var object = Object(val);
+    var keys = [];
+    for (var key in object) {
+      keys.push(key);
+    }
+    keys.reverse();
+
+    // Rather than returning an object with a next method, we keep
+    // things simple and return the next function itself.
+    return function next() {
+      while (keys.length) {
+        var key = keys.pop();
+        if (key in object) {
+          next.value = key;
+          next.done = false;
+          return next;
+        }
+      }
+
+      // To avoid creating an additional object, we just hang the .value
+      // and .done properties off the next function object itself. This
+      // also ensures that the minifier will not anonymize the function.
+      next.done = true;
+      return next;
+    };
+  };
+
+  function values(iterable) {
+    if (iterable) {
+      var iteratorMethod = iterable[iteratorSymbol];
+      if (iteratorMethod) {
+        return iteratorMethod.call(iterable);
+      }
+
+      if (typeof iterable.next === "function") {
+        return iterable;
+      }
+
+      if (!isNaN(iterable.length)) {
+        var i = -1, next = function next() {
+          while (++i < iterable.length) {
+            if (hasOwn.call(iterable, i)) {
+              next.value = iterable[i];
+              next.done = false;
+              return next;
+            }
+          }
+
+          next.value = undefined;
+          next.done = true;
+
+          return next;
+        };
+
+        return next.next = next;
+      }
+    }
+
+    // Return an iterator with no values.
+    return { next: doneResult };
+  }
+  exports.values = values;
+
+  function doneResult() {
+    return { value: undefined, done: true };
+  }
+
+  Context.prototype = {
+    constructor: Context,
+
+    reset: function(skipTempReset) {
+      this.prev = 0;
+      this.next = 0;
+      // Resetting context._sent for legacy support of Babel's
+      // function.sent implementation.
+      this.sent = this._sent = undefined;
+      this.done = false;
+      this.delegate = null;
+
+      this.method = "next";
+      this.arg = undefined;
+
+      this.tryEntries.forEach(resetTryEntry);
+
+      if (!skipTempReset) {
+        for (var name in this) {
+          // Not sure about the optimal order of these conditions:
+          if (name.charAt(0) === "t" &&
+              hasOwn.call(this, name) &&
+              !isNaN(+name.slice(1))) {
+            this[name] = undefined;
+          }
+        }
+      }
+    },
+
+    stop: function() {
+      this.done = true;
+
+      var rootEntry = this.tryEntries[0];
+      var rootRecord = rootEntry.completion;
+      if (rootRecord.type === "throw") {
+        throw rootRecord.arg;
+      }
+
+      return this.rval;
+    },
+
+    dispatchException: function(exception) {
+      if (this.done) {
+        throw exception;
+      }
+
+      var context = this;
+      function handle(loc, caught) {
+        record.type = "throw";
+        record.arg = exception;
+        context.next = loc;
+
+        if (caught) {
+          // If the dispatched exception was caught by a catch block,
+          // then let that catch block handle the exception normally.
+          context.method = "next";
+          context.arg = undefined;
+        }
+
+        return !! caught;
+      }
+
+      for (var i = this.tryEntries.length - 1; i >= 0; --i) {
+        var entry = this.tryEntries[i];
+        var record = entry.completion;
+
+        if (entry.tryLoc === "root") {
+          // Exception thrown outside of any try block that could handle
+          // it, so set the completion value of the entire function to
+          // throw the exception.
+          return handle("end");
+        }
+
+        if (entry.tryLoc <= this.prev) {
+          var hasCatch = hasOwn.call(entry, "catchLoc");
+          var hasFinally = hasOwn.call(entry, "finallyLoc");
+
+          if (hasCatch && hasFinally) {
+            if (this.prev < entry.catchLoc) {
+              return handle(entry.catchLoc, true);
+            } else if (this.prev < entry.finallyLoc) {
+              return handle(entry.finallyLoc);
+            }
+
+          } else if (hasCatch) {
+            if (this.prev < entry.catchLoc) {
+              return handle(entry.catchLoc, true);
+            }
+
+          } else if (hasFinally) {
+            if (this.prev < entry.finallyLoc) {
+              return handle(entry.finallyLoc);
+            }
+
+          } else {
+            throw new Error("try statement without catch or finally");
+          }
+        }
+      }
+    },
+
+    abrupt: function(type, arg) {
+      for (var i = this.tryEntries.length - 1; i >= 0; --i) {
+        var entry = this.tryEntries[i];
+        if (entry.tryLoc <= this.prev &&
+            hasOwn.call(entry, "finallyLoc") &&
+            this.prev < entry.finallyLoc) {
+          var finallyEntry = entry;
+          break;
+        }
+      }
+
+      if (finallyEntry &&
+          (type === "break" ||
+           type === "continue") &&
+          finallyEntry.tryLoc <= arg &&
+          arg <= finallyEntry.finallyLoc) {
+        // Ignore the finally entry if control is not jumping to a
+        // location outside the try/catch block.
+        finallyEntry = null;
+      }
+
+      var record = finallyEntry ? finallyEntry.completion : {};
+      record.type = type;
+      record.arg = arg;
+
+      if (finallyEntry) {
+        this.method = "next";
+        this.next = finallyEntry.finallyLoc;
+        return ContinueSentinel;
+      }
+
+      return this.complete(record);
+    },
+
+    complete: function(record, afterLoc) {
+      if (record.type === "throw") {
+        throw record.arg;
+      }
+
+      if (record.type === "break" ||
+          record.type === "continue") {
+        this.next = record.arg;
+      } else if (record.type === "return") {
+        this.rval = this.arg = record.arg;
+        this.method = "return";
+        this.next = "end";
+      } else if (record.type === "normal" && afterLoc) {
+        this.next = afterLoc;
+      }
+
+      return ContinueSentinel;
+    },
+
+    finish: function(finallyLoc) {
+      for (var i = this.tryEntries.length - 1; i >= 0; --i) {
+        var entry = this.tryEntries[i];
+        if (entry.finallyLoc === finallyLoc) {
+          this.complete(entry.completion, entry.afterLoc);
+          resetTryEntry(entry);
+          return ContinueSentinel;
+        }
+      }
+    },
+
+    "catch": function(tryLoc) {
+      for (var i = this.tryEntries.length - 1; i >= 0; --i) {
+        var entry = this.tryEntries[i];
+        if (entry.tryLoc === tryLoc) {
+          var record = entry.completion;
+          if (record.type === "throw") {
+            var thrown = record.arg;
+            resetTryEntry(entry);
+          }
+          return thrown;
+        }
+      }
+
+      // The context.catch method must only be called with a location
+      // argument that corresponds to a known catch block.
+      throw new Error("illegal catch attempt");
+    },
+
+    delegateYield: function(iterable, resultName, nextLoc) {
+      this.delegate = {
+        iterator: values(iterable),
+        resultName: resultName,
+        nextLoc: nextLoc
+      };
+
+      if (this.method === "next") {
+        // Deliberately forget the last sent value so that we don't
+        // accidentally pass it on to the delegate.
+        this.arg = undefined;
+      }
+
+      return ContinueSentinel;
+    }
+  };
+
+  // Regardless of whether this script is executing as a CommonJS module
+  // or not, return the runtime object so that we can declare the variable
+  // regeneratorRuntime in the outer scope, which allows this module to be
+  // injected easily by `bin/regenerator --include-runtime script.js`.
+  return exports;
+
+}(
+  // If this script is executing as a CommonJS module, use module.exports
+  // as the regeneratorRuntime namespace. Otherwise create a new empty
+  // object. Either way, the resulting object will be used to initialize
+  // the regeneratorRuntime variable at the top of this file.
+  typeof module === "object" ? module.exports : {}
+));
+
+try {
+  regeneratorRuntime = runtime;
+} catch (accidentalStrictMode) {
+  // This module should not be running in strict mode, so the above
+  // assignment should always work unless something is misconfigured. Just
+  // in case runtime.js accidentally runs in strict mode, in modern engines
+  // we can explicitly access globalThis. In older engines we can escape
+  // strict mode using a global Function call. This could conceivably fail
+  // if a Content Security Policy forbids using Function, but in that case
+  // the proper solution is to fix the accidental strict mode problem. If
+  // you've misconfigured your bundler to force strict mode and applied a
+  // CSP to forbid Function, and you're not willing to fix either of those
+  // problems, please detail your unique predicament in a GitHub issue.
+  if (typeof globalThis === "object") {
+    globalThis.regeneratorRuntime = runtime;
+  } else {
+    Function("r", "regeneratorRuntime = r")(runtime);
+  }
+}
+
+function _typeof(obj) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (obj) { return typeof obj; } : function (obj) { return obj && "function" == typeof Symbol && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }, _typeof(obj); }
+function ownKeys(object, enumerableOnly) { var keys = Object.keys(object); if (Object.getOwnPropertySymbols) { var symbols = Object.getOwnPropertySymbols(object); enumerableOnly && (symbols = symbols.filter(function (sym) { return Object.getOwnPropertyDescriptor(object, sym).enumerable; })), keys.push.apply(keys, symbols); } return keys; }
+function _objectSpread(target) { for (var i = 1; i < arguments.length; i++) { var source = null != arguments[i] ? arguments[i] : {}; i % 2 ? ownKeys(Object(source), !0).forEach(function (key) { _defineProperty(target, key, source[key]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(target, Object.getOwnPropertyDescriptors(source)) : ownKeys(Object(source)).forEach(function (key) { Object.defineProperty(target, key, Object.getOwnPropertyDescriptor(source, key)); }); } return target; }
+function _defineProperty(obj, key, value) { key = _toPropertyKey(key); if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+function _toPropertyKey(arg) { var key = _toPrimitive(arg, "string"); return _typeof(key) === "symbol" ? key : String(key); }
+function _toPrimitive(input, hint) { if (_typeof(input) !== "object" || input === null) return input; var prim = input[Symbol.toPrimitive]; if (prim !== undefined) { var res = prim.call(input, hint || "default"); if (_typeof(res) !== "object") return res; throw new TypeError("@@toPrimitive must return a primitive value."); } return (hint === "string" ? String : Number)(input); }
+function _regeneratorRuntime() { "use strict"; /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/facebook/regenerator/blob/main/LICENSE */ _regeneratorRuntime = function _regeneratorRuntime() { return exports; }; var exports = {}, Op = Object.prototype, hasOwn = Op.hasOwnProperty, defineProperty = Object.defineProperty || function (obj, key, desc) { obj[key] = desc.value; }, $Symbol = "function" == typeof Symbol ? Symbol : {}, iteratorSymbol = $Symbol.iterator || "@@iterator", asyncIteratorSymbol = $Symbol.asyncIterator || "@@asyncIterator", toStringTagSymbol = $Symbol.toStringTag || "@@toStringTag"; function define(obj, key, value) { return Object.defineProperty(obj, key, { value: value, enumerable: !0, configurable: !0, writable: !0 }), obj[key]; } try { define({}, ""); } catch (err) { define = function define(obj, key, value) { return obj[key] = value; }; } function wrap(innerFn, outerFn, self, tryLocsList) { var protoGenerator = outerFn && outerFn.prototype instanceof Generator ? outerFn : Generator, generator = Object.create(protoGenerator.prototype), context = new Context(tryLocsList || []); return defineProperty(generator, "_invoke", { value: makeInvokeMethod(innerFn, self, context) }), generator; } function tryCatch(fn, obj, arg) { try { return { type: "normal", arg: fn.call(obj, arg) }; } catch (err) { return { type: "throw", arg: err }; } } exports.wrap = wrap; var ContinueSentinel = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} var IteratorPrototype = {}; define(IteratorPrototype, iteratorSymbol, function () { return this; }); var getProto = Object.getPrototypeOf, NativeIteratorPrototype = getProto && getProto(getProto(values([]))); NativeIteratorPrototype && NativeIteratorPrototype !== Op && hasOwn.call(NativeIteratorPrototype, iteratorSymbol) && (IteratorPrototype = NativeIteratorPrototype); var Gp = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(IteratorPrototype); function defineIteratorMethods(prototype) { ["next", "throw", "return"].forEach(function (method) { define(prototype, method, function (arg) { return this._invoke(method, arg); }); }); } function AsyncIterator(generator, PromiseImpl) { function invoke(method, arg, resolve, reject) { var record = tryCatch(generator[method], generator, arg); if ("throw" !== record.type) { var result = record.arg, value = result.value; return value && "object" == _typeof(value) && hasOwn.call(value, "__await") ? PromiseImpl.resolve(value.__await).then(function (value) { invoke("next", value, resolve, reject); }, function (err) { invoke("throw", err, resolve, reject); }) : PromiseImpl.resolve(value).then(function (unwrapped) { result.value = unwrapped, resolve(result); }, function (error) { return invoke("throw", error, resolve, reject); }); } reject(record.arg); } var previousPromise; defineProperty(this, "_invoke", { value: function value(method, arg) { function callInvokeWithMethodAndArg() { return new PromiseImpl(function (resolve, reject) { invoke(method, arg, resolve, reject); }); } return previousPromise = previousPromise ? previousPromise.then(callInvokeWithMethodAndArg, callInvokeWithMethodAndArg) : callInvokeWithMethodAndArg(); } }); } function makeInvokeMethod(innerFn, self, context) { var state = "suspendedStart"; return function (method, arg) { if ("executing" === state) throw new Error("Generator is already running"); if ("completed" === state) { if ("throw" === method) throw arg; return doneResult(); } for (context.method = method, context.arg = arg;;) { var delegate = context.delegate; if (delegate) { var delegateResult = maybeInvokeDelegate(delegate, context); if (delegateResult) { if (delegateResult === ContinueSentinel) continue; return delegateResult; } } if ("next" === context.method) context.sent = context._sent = context.arg;else if ("throw" === context.method) { if ("suspendedStart" === state) throw state = "completed", context.arg; context.dispatchException(context.arg); } else "return" === context.method && context.abrupt("return", context.arg); state = "executing"; var record = tryCatch(innerFn, self, context); if ("normal" === record.type) { if (state = context.done ? "completed" : "suspendedYield", record.arg === ContinueSentinel) continue; return { value: record.arg, done: context.done }; } "throw" === record.type && (state = "completed", context.method = "throw", context.arg = record.arg); } }; } function maybeInvokeDelegate(delegate, context) { var methodName = context.method, method = delegate.iterator[methodName]; if (undefined === method) return context.delegate = null, "throw" === methodName && delegate.iterator.return && (context.method = "return", context.arg = undefined, maybeInvokeDelegate(delegate, context), "throw" === context.method) || "return" !== methodName && (context.method = "throw", context.arg = new TypeError("The iterator does not provide a '" + methodName + "' method")), ContinueSentinel; var record = tryCatch(method, delegate.iterator, context.arg); if ("throw" === record.type) return context.method = "throw", context.arg = record.arg, context.delegate = null, ContinueSentinel; var info = record.arg; return info ? info.done ? (context[delegate.resultName] = info.value, context.next = delegate.nextLoc, "return" !== context.method && (context.method = "next", context.arg = undefined), context.delegate = null, ContinueSentinel) : info : (context.method = "throw", context.arg = new TypeError("iterator result is not an object"), context.delegate = null, ContinueSentinel); } function pushTryEntry(locs) { var entry = { tryLoc: locs[0] }; 1 in locs && (entry.catchLoc = locs[1]), 2 in locs && (entry.finallyLoc = locs[2], entry.afterLoc = locs[3]), this.tryEntries.push(entry); } function resetTryEntry(entry) { var record = entry.completion || {}; record.type = "normal", delete record.arg, entry.completion = record; } function Context(tryLocsList) { this.tryEntries = [{ tryLoc: "root" }], tryLocsList.forEach(pushTryEntry, this), this.reset(!0); } function values(iterable) { if (iterable) { var iteratorMethod = iterable[iteratorSymbol]; if (iteratorMethod) return iteratorMethod.call(iterable); if ("function" == typeof iterable.next) return iterable; if (!isNaN(iterable.length)) { var i = -1, next = function next() { for (; ++i < iterable.length;) if (hasOwn.call(iterable, i)) return next.value = iterable[i], next.done = !1, next; return next.value = undefined, next.done = !0, next; }; return next.next = next; } } return { next: doneResult }; } function doneResult() { return { value: undefined, done: !0 }; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, defineProperty(Gp, "constructor", { value: GeneratorFunctionPrototype, configurable: !0 }), defineProperty(GeneratorFunctionPrototype, "constructor", { value: GeneratorFunction, configurable: !0 }), GeneratorFunction.displayName = define(GeneratorFunctionPrototype, toStringTagSymbol, "GeneratorFunction"), exports.isGeneratorFunction = function (genFun) { var ctor = "function" == typeof genFun && genFun.constructor; return !!ctor && (ctor === GeneratorFunction || "GeneratorFunction" === (ctor.displayName || ctor.name)); }, exports.mark = function (genFun) { return Object.setPrototypeOf ? Object.setPrototypeOf(genFun, GeneratorFunctionPrototype) : (genFun.__proto__ = GeneratorFunctionPrototype, define(genFun, toStringTagSymbol, "GeneratorFunction")), genFun.prototype = Object.create(Gp), genFun; }, exports.awrap = function (arg) { return { __await: arg }; }, defineIteratorMethods(AsyncIterator.prototype), define(AsyncIterator.prototype, asyncIteratorSymbol, function () { return this; }), exports.AsyncIterator = AsyncIterator, exports.async = function (innerFn, outerFn, self, tryLocsList, PromiseImpl) { void 0 === PromiseImpl && (PromiseImpl = Promise); var iter = new AsyncIterator(wrap(innerFn, outerFn, self, tryLocsList), PromiseImpl); return exports.isGeneratorFunction(outerFn) ? iter : iter.next().then(function (result) { return result.done ? result.value : iter.next(); }); }, defineIteratorMethods(Gp), define(Gp, toStringTagSymbol, "Generator"), define(Gp, iteratorSymbol, function () { return this; }), define(Gp, "toString", function () { return "[object Generator]"; }), exports.keys = function (val) { var object = Object(val), keys = []; for (var key in object) keys.push(key); return keys.reverse(), function next() { for (; keys.length;) { var key = keys.pop(); if (key in object) return next.value = key, next.done = !1, next; } return next.done = !0, next; }; }, exports.values = values, Context.prototype = { constructor: Context, reset: function reset(skipTempReset) { if (this.prev = 0, this.next = 0, this.sent = this._sent = undefined, this.done = !1, this.delegate = null, this.method = "next", this.arg = undefined, this.tryEntries.forEach(resetTryEntry), !skipTempReset) for (var name in this) "t" === name.charAt(0) && hasOwn.call(this, name) && !isNaN(+name.slice(1)) && (this[name] = undefined); }, stop: function stop() { this.done = !0; var rootRecord = this.tryEntries[0].completion; if ("throw" === rootRecord.type) throw rootRecord.arg; return this.rval; }, dispatchException: function dispatchException(exception) { if (this.done) throw exception; var context = this; function handle(loc, caught) { return record.type = "throw", record.arg = exception, context.next = loc, caught && (context.method = "next", context.arg = undefined), !!caught; } for (var i = this.tryEntries.length - 1; i >= 0; --i) { var entry = this.tryEntries[i], record = entry.completion; if ("root" === entry.tryLoc) return handle("end"); if (entry.tryLoc <= this.prev) { var hasCatch = hasOwn.call(entry, "catchLoc"), hasFinally = hasOwn.call(entry, "finallyLoc"); if (hasCatch && hasFinally) { if (this.prev < entry.catchLoc) return handle(entry.catchLoc, !0); if (this.prev < entry.finallyLoc) return handle(entry.finallyLoc); } else if (hasCatch) { if (this.prev < entry.catchLoc) return handle(entry.catchLoc, !0); } else { if (!hasFinally) throw new Error("try statement without catch or finally"); if (this.prev < entry.finallyLoc) return handle(entry.finallyLoc); } } } }, abrupt: function abrupt(type, arg) { for (var i = this.tryEntries.length - 1; i >= 0; --i) { var entry = this.tryEntries[i]; if (entry.tryLoc <= this.prev && hasOwn.call(entry, "finallyLoc") && this.prev < entry.finallyLoc) { var finallyEntry = entry; break; } } finallyEntry && ("break" === type || "continue" === type) && finallyEntry.tryLoc <= arg && arg <= finallyEntry.finallyLoc && (finallyEntry = null); var record = finallyEntry ? finallyEntry.completion : {}; return record.type = type, record.arg = arg, finallyEntry ? (this.method = "next", this.next = finallyEntry.finallyLoc, ContinueSentinel) : this.complete(record); }, complete: function complete(record, afterLoc) { if ("throw" === record.type) throw record.arg; return "break" === record.type || "continue" === record.type ? this.next = record.arg : "return" === record.type ? (this.rval = this.arg = record.arg, this.method = "return", this.next = "end") : "normal" === record.type && afterLoc && (this.next = afterLoc), ContinueSentinel; }, finish: function finish(finallyLoc) { for (var i = this.tryEntries.length - 1; i >= 0; --i) { var entry = this.tryEntries[i]; if (entry.finallyLoc === finallyLoc) return this.complete(entry.completion, entry.afterLoc), resetTryEntry(entry), ContinueSentinel; } }, catch: function _catch(tryLoc) { for (var i = this.tryEntries.length - 1; i >= 0; --i) { var entry = this.tryEntries[i]; if (entry.tryLoc === tryLoc) { var record = entry.completion; if ("throw" === record.type) { var thrown = record.arg; resetTryEntry(entry); } return thrown; } } throw new Error("illegal catch attempt"); }, delegateYield: function delegateYield(iterable, resultName, nextLoc) { return this.delegate = { iterator: values(iterable), resultName: resultName, nextLoc: nextLoc }, "next" === this.method && (this.arg = undefined), ContinueSentinel; } }, exports; }
+function asyncGeneratorStep(gen, resolve, reject, _next, _throw, key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { Promise.resolve(value).then(_next, _throw); } }
+function _asyncToGenerator(fn) { return function () { var self = this, args = arguments; return new Promise(function (resolve, reject) { var gen = fn.apply(self, args); function _next(value) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "next", value); } function _throw(err) { asyncGeneratorStep(gen, resolve, reject, _next, _throw, "throw", err); } _next(undefined); }); }; }
+var $ = function $(s) {
+  return document.querySelector(s);
+};
+var esc = function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[c];
+  });
+};
+var mb = function mb(n) {
+  return n >= 1 << 30 ? (n / (1 << 30)).toFixed(1) + ' GB' : n >= 1 << 20 ? Math.round(n / (1 << 20)) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+};
+var estado = {},
+  atual = '',
+  jogos = {
+    box: [],
+    celular: []
+  };
+function aviso(t) {
+  var seg = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 4;
+  var m = $('#msg');
+  m.textContent = t;
+  m.style.display = 'block';
+  clearTimeout(aviso.t);
+  aviso.t = setTimeout(function () {
+    return m.style.display = 'none';
+  }, seg * 1000);
+}
+function api(_x, _x2, _x3) {
+  return _api.apply(this, arguments);
+}
+function _api() {
+  _api = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee(caminho, corpo, metodo) {
+    var op, r, j;
+    return _regeneratorRuntime().wrap(function _callee$(_context) {
+      while (1) switch (_context.prev = _context.next) {
+        case 0:
+          op = corpo === undefined ? {} : {
+            method: metodo || 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(corpo)
+          };
+          _context.next = 3;
+          return fetch(caminho, op);
+        case 3:
+          r = _context.sent;
+          _context.next = 6;
+          return r.json().catch(function () {
+            return {
+              erro: 'resposta inválida da box'
+            };
+          });
+        case 6:
+          j = _context.sent;
+          if (!(!r.ok || j.erro)) {
+            _context.next = 9;
+            break;
+          }
+          throw new Error(j.erro || 'HTTP ' + r.status);
+        case 9:
+          return _context.abrupt("return", j);
+        case 10:
+        case "end":
+          return _context.stop();
+      }
+    }, _callee);
+  }));
+  return _api.apply(this, arguments);
+}
+function tentar(_x4) {
+  return _tentar.apply(this, arguments);
+}
+function _tentar() {
+  _tentar = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee2(f) {
+    return _regeneratorRuntime().wrap(function _callee2$(_context2) {
+      while (1) switch (_context2.prev = _context2.next) {
+        case 0:
+          _context2.prev = 0;
+          _context2.next = 3;
+          return f();
+        case 3:
+          return _context2.abrupt("return", _context2.sent);
+        case 6:
+          _context2.prev = 6;
+          _context2.t0 = _context2["catch"](0);
+          aviso('⚠ ' + _context2.t0.message, 7);
+        case 9:
+        case "end":
+          return _context2.stop();
+      }
+    }, _callee2, null, [[0, 6]]);
+  }));
+  return _tentar.apply(this, arguments);
+}
+document.querySelectorAll('nav button').forEach(function (b) {
+  return b.onclick = function () {
+    document.querySelectorAll('nav button, section').forEach(function (x) {
+      return x.classList.remove('ativo');
+    });
+    b.classList.add('ativo');
+    $('#' + b.dataset.aba).classList.add('ativo');
+    if (b.dataset.aba === 'online') {
+      carregarKits();
+      carregarOnline();
+    }
+    if (b.dataset.aba === 'arquivos' && !atual) abrir(raizDe($('#fonte').value));
+  };
+});
+function carregarEstado() {
+  return _carregarEstado.apply(this, arguments);
+} // ---------- jogos e capas ----------
+function _carregarEstado() {
+  _carregarEstado = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee3() {
+    return _regeneratorRuntime().wrap(function _callee3$(_context3) {
+      while (1) switch (_context3.prev = _context3.next) {
+        case 0:
+          _context3.prev = 0;
+          _context3.next = 3;
+          return api('/api/estado');
+        case 3:
+          estado = _context3.sent;
+          $('#status').innerHTML = (estado.pendrive ? "\uD83D\uDCBE pendrive da box: ".concat(mb(estado.livre), " livres") : '⚠ sem pendrive na box') + ' · ' + (estado.ps2_aberto ? '<span class="ok">● PS2 com o navegador aberto</span>' : '<span class="p">○ navegador fechado no PS2</span>');
+          _context3.next = 10;
+          break;
+        case 7:
+          _context3.prev = 7;
+          _context3.t0 = _context3["catch"](0);
+          $('#status').textContent = '⚠ TV box fora do alcance: ' + _context3.t0.message;
+        case 10:
+        case "end":
+          return _context3.stop();
+      }
+    }, _callee3, null, [[0, 7]]);
+  }));
+  return _carregarEstado.apply(this, arguments);
+}
+var J = []; // referências para os botões (nomes com aspas não entram no onclick)
+var ref = function ref(o) {
+  return J.push(o) - 1;
+};
+function cartaoJogo(j) {
+  var n = ref(j);
+  var capa = j.codigo ? "<img loading=\"lazy\" src=\"/api/capa/".concat(encodeURIComponent(j.codigo), ".jpg\" onerror=\"this.outerHTML='<div class=semcapa>sem capa</div>'\">") : '<div class="semcapa">código não encontrado</div>';
+  var acoes = '';
+  if (j.onde === 'celular') {
+    acoes = "<button class=\"b s\" onclick=\"celJogar(J[".concat(n, "].nome)\">\u25B6 Jogar daqui</button>\n      <button class=\"b s\" onclick=\"celBox(J[").concat(n, "].nome)\">\u2192 pendrive da box</button>\n      <button class=\"b s\" onclick=\"celPs2(J[").concat(n, "].nome)\">\u2192 pendrive do PS2</button>");
+  } else if (j.codigo && !j.capa) acoes = "<button class=\"b s\" onclick=\"baixarCapas([J[".concat(n, "].codigo])\">\uD83D\uDDBC capa</button>");
+  return "<div class=\"jogo\">".concat(capa, "<div class=\"i\"><div class=\"t\">").concat(esc(j.titulo), "</div>\n    <div class=\"c\">").concat(esc(j.codigo || '?'), " \xB7 ").concat(j.pasta || 'DVD', " \xB7 ").concat(mb(j.tam)).concat(j.onde === 'box' ? j.capa ? ' · 🖼' : ' · sem capa no pendrive' : '', "</div>").concat(acoes, "</div></div>");
+}
+function carregarJogos() {
+  return _carregarJogos.apply(this, arguments);
+}
+function _carregarJogos() {
+  _carregarJogos = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee4() {
+    var j;
+    return _regeneratorRuntime().wrap(function _callee4$(_context4) {
+      while (1) switch (_context4.prev = _context4.next) {
+        case 0:
+          _context4.next = 2;
+          return tentar(function () {
+            return api('/api/jogos');
+          });
+        case 2:
+          j = _context4.sent;
+          if (j) {
+            _context4.next = 5;
+            break;
+          }
+          return _context4.abrupt("return");
+        case 5:
+          jogos = j;
+          $('#jogosBox').innerHTML = j.box.map(cartaoJogo).join('') || '<div class="p">Nenhum ISO em DVD/ ou CD/ do pendrive da box.</div>';
+          $('#jogosCel').innerHTML = j.celular.map(cartaoJogo).join('');
+          $('#kVersao').innerHTML = '<option value="">— nenhuma —</option>' + j.box.filter(function (x) {
+            return x.codigo;
+          }).map(function (x) {
+            return "<option value=\"".concat(esc(x.nome), "\">").concat(esc(x.titulo), " (").concat(esc(x.codigo), ")</option>");
+          }).join('');
+        case 9:
+        case "end":
+          return _context4.stop();
+      }
+    }, _callee4);
+  }));
+  return _carregarJogos.apply(this, arguments);
+}
+function baixarCapas(_x5) {
+  return _baixarCapas.apply(this, arguments);
+} // ---------- celular ----------
+function _baixarCapas() {
+  _baixarCapas = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee6(codigos) {
+    return _regeneratorRuntime().wrap(function _callee6$(_context6) {
+      while (1) switch (_context6.prev = _context6.next) {
+        case 0:
+          _context6.next = 2;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee5() {
+            return _regeneratorRuntime().wrap(function _callee5$(_context5) {
+              while (1) switch (_context5.prev = _context5.next) {
+                case 0:
+                  _context5.next = 2;
+                  return api('/api/capas/baixar', {
+                    codigos: codigos
+                  });
+                case 2:
+                  aviso('Baixando capas…');
+                  vigiar();
+                case 4:
+                case "end":
+                  return _context5.stop();
+              }
+            }, _callee5);
+          })));
+        case 2:
+        case "end":
+          return _context6.stop();
+      }
+    }, _callee6);
+  }));
+  return _baixarCapas.apply(this, arguments);
+}
+function procurarCelular() {
+  return _procurarCelular.apply(this, arguments);
+}
+function _procurarCelular() {
+  _procurarCelular = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee8() {
+    return _regeneratorRuntime().wrap(function _callee8$(_context8) {
+      while (1) switch (_context8.prev = _context8.next) {
+        case 0:
+          if (window.Henbox) {
+            _context8.next = 3;
+            break;
+          }
+          $('#celInfo').textContent = 'Abra esta página pelo app PS2 Henbox no celular para ver os ISOs dele.';
+          return _context8.abrupt("return");
+        case 3:
+          $('#celInfo').textContent = '🔎 Procurando ISOs na memória do celular…';
+          setTimeout( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee7() {
+            var s, r;
+            return _regeneratorRuntime().wrap(function _callee7$(_context7) {
+              while (1) switch (_context7.prev = _context7.next) {
+                case 0:
+                  _context7.prev = 0;
+                  s = JSON.parse(Henbox.servidor());
+                  _context7.next = 8;
+                  break;
+                case 4:
+                  _context7.prev = 4;
+                  _context7.t0 = _context7["catch"](0);
+                  $('#celInfo').textContent = '⚠ ' + _context7.t0;
+                  return _context7.abrupt("return");
+                case 8:
+                  if (!s.erro) {
+                    _context7.next = 11;
+                    break;
+                  }
+                  $('#celInfo').textContent = '⚠ ' + s.erro;
+                  return _context7.abrupt("return");
+                case 11:
+                  _context7.next = 13;
+                  return tentar(function () {
+                    return api('/api/celular/registrar', {
+                      url: s.url,
+                      chave: s.chave
+                    });
+                  });
+                case 13:
+                  r = _context7.sent;
+                  if (r) {
+                    $('#celInfo').textContent = "".concat(r.isos.length, " ISO(s) em ").concat(r.aparelho, ". O celular fica servindo enquanto o aviso \"PS2 Henbox\" estiver na barra.");
+                    carregarJogos();
+                  }
+                case 15:
+                case "end":
+                  return _context7.stop();
+              }
+            }, _callee7, null, [[0, 4]]);
+          })), 50);
+        case 5:
+        case "end":
+          return _context8.stop();
+      }
+    }, _callee8);
+  }));
+  return _procurarCelular.apply(this, arguments);
+}
+function celJogar(_x6) {
+  return _celJogar.apply(this, arguments);
+}
+function _celJogar() {
+  _celJogar = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee10(nome) {
+    return _regeneratorRuntime().wrap(function _callee10$(_context10) {
+      while (1) switch (_context10.prev = _context10.next) {
+        case 0:
+          _context10.next = 2;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee9() {
+            var r;
+            return _regeneratorRuntime().wrap(function _callee9$(_context9) {
+              while (1) switch (_context9.prev = _context9.next) {
+                case 0:
+                  _context9.next = 2;
+                  return api('/api/celular/jogar', {
+                    nome: nome
+                  });
+                case 2:
+                  r = _context9.sent;
+                  aviso(r.ok ? '▶ Abrindo no PS2 pela rede (não deixe o celular sair do Wi-Fi)' : '⚠ ' + r.resposta, 7);
+                case 4:
+                case "end":
+                  return _context9.stop();
+              }
+            }, _callee9);
+          })));
+        case 2:
+        case "end":
+          return _context10.stop();
+      }
+    }, _callee10);
+  }));
+  return _celJogar.apply(this, arguments);
+}
+function celBox(_x7) {
+  return _celBox.apply(this, arguments);
+}
+function _celBox() {
+  _celBox = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee12(nome) {
+    return _regeneratorRuntime().wrap(function _callee12$(_context12) {
+      while (1) switch (_context12.prev = _context12.next) {
+        case 0:
+          _context12.next = 2;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee11() {
+            return _regeneratorRuntime().wrap(function _callee11$(_context11) {
+              while (1) switch (_context11.prev = _context11.next) {
+                case 0:
+                  _context11.next = 2;
+                  return api('/api/celular/para-box', {
+                    nome: nome
+                  });
+                case 2:
+                  aviso('Copiando para o pendrive da box…');
+                  vigiar();
+                case 4:
+                case "end":
+                  return _context11.stop();
+              }
+            }, _callee11);
+          })));
+        case 2:
+        case "end":
+          return _context12.stop();
+      }
+    }, _callee12);
+  }));
+  return _celBox.apply(this, arguments);
+}
+function celPs2(_x8) {
+  return _celPs.apply(this, arguments);
+} // ---------- kits ----------
+function _celPs() {
+  _celPs = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee14(nome) {
+    return _regeneratorRuntime().wrap(function _callee14$(_context14) {
+      while (1) switch (_context14.prev = _context14.next) {
+        case 0:
+          _context14.next = 2;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee13() {
+            var r;
+            return _regeneratorRuntime().wrap(function _callee13$(_context13) {
+              while (1) switch (_context13.prev = _context13.next) {
+                case 0:
+                  _context13.next = 2;
+                  return api('/api/celular/para-ps2', {
+                    nome: nome
+                  });
+                case 2:
+                  r = _context13.sent;
+                  aviso(r.ok ? 'O PS2 está copiando (veja o aviso na TV)' : '⚠ ' + r.resposta, 7);
+                case 4:
+                case "end":
+                  return _context13.stop();
+              }
+            }, _callee13);
+          })));
+        case 2:
+        case "end":
+          return _context14.stop();
+      }
+    }, _callee14);
+  }));
+  return _celPs.apply(this, arguments);
+}
+function carregarKits() {
+  return _carregarKits.apply(this, arguments);
+}
+function _carregarKits() {
+  _carregarKits = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee15() {
+    var dk, r;
+    return _regeneratorRuntime().wrap(function _callee15$(_context15) {
+      while (1) switch (_context15.prev = _context15.next) {
+        case 0:
+          $('#kits').innerHTML = '<div class="p">carregando kits…</div>';
+          dk = estado.dns_kit || {};
+          $('#dnsKit').innerHTML = dk.ip && dk.ate * 1000 > Date.now() ? "<div class=\"cartao\">\uD83C\uDF10 DNS do kit <b>".concat(esc(dk.ip), "</b> ligado no PS2 (cabo da box) at\xE9 ").concat(new Date(dk.ate * 1000).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit'
+          }), " <button class=\"b s r\" onclick=\"desligarDns()\">desligar</button></div>") : '';
+          _context15.next = 5;
+          return tentar(function () {
+            return api('/api/kits');
+          });
+        case 5:
+          r = _context15.sent;
+          if (r) {
+            _context15.next = 9;
+            break;
+          }
+          $('#kits').innerHTML = '';
+          return _context15.abrupt("return");
+        case 9:
+          $('#kits').innerHTML = r.kits.map(function (k) {
+            var meus = k.meus.map(function (m) {
+              var n = ref({
+                kit: k.id,
+                nome: m.nome
+              });
+              var comp = m.compativel === true ? '<span class="ok">✅ versão igual à testada</span>' : m.compativel === false ? '<span class="nao">❌ versão diferente</span>' : '';
+              return "<div style=\"margin-top:6px\">".concat(m.onde === 'box' ? '💾' : '📱', " ").concat(esc(m.nome), " ").concat(comp, "<br>\n        ").concat(m.onde === 'box' ? "<button class=\"b v\" onclick=\"aplicar(J[".concat(n, "].kit,'box',J[").concat(n, "].nome,").concat(m.compativel === false, ")\">\u26A1 Jogar online (aplicar kit)</button>\n        ").concat(k.arquivos.some(function (a) {
+                return a.tipo === 'ppf';
+              }) ? "<button class=\"b s\" onclick=\"desfazer(J[".concat(n, "].kit,J[").concat(n, "].nome)\">\u21A9 desfazer patch</button>") : '') : "<button class=\"b s\" onclick=\"celBox(J[".concat(n, "].nome)\">\u2192 copiar para a box primeiro</button>"), "</div>");
+            }).join('') || '<div class="p" style="margin-top:6px">Você ainda não tem esse jogo no pendrive da box nem no celular.</div>';
+            return "<div class=\"cartao\"><div class=\"t\">".concat(esc(k.titulo || k.codigo), "</div>\n      <div class=\"p\">").concat(esc(k.codigo)).concat(k.servidor ? ' · 🖥 ' + esc(k.servidor) : '').concat(k.dns ? ' · DNS ' + esc(k.dns) : '').concat(k.testado ? ' · ✅ testado online em ' + esc(k.testado) : '').concat(k.autor ? ' · por ' + esc(k.autor) : '', "</div>\n      <div class=\"p\">\uD83D\uDCE6 ").concat(k.arquivos.map(function (a) {
+              return esc(a.tipo.toUpperCase());
+            }).join(' + ') || 'só DNS', "</div>\n      ").concat(k.notas ? "<div style=\"margin-top:6px;font-size:14px;white-space:pre-wrap\">".concat(esc(k.notas), "</div>") : '').concat(meus, "</div>");
+          }).join('') || '<div class="p">Nenhum kit publicado ainda. Seja o primeiro a enviar!</div>';
+        case 10:
+        case "end":
+          return _context15.stop();
+      }
+    }, _callee15);
+  }));
+  return _carregarKits.apply(this, arguments);
+}
+function aplicar(_x9, _x10, _x11, _x12) {
+  return _aplicar.apply(this, arguments);
+}
+function _aplicar() {
+  _aplicar = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee17(kit, onde, nome, forcar) {
+    return _regeneratorRuntime().wrap(function _callee17$(_context17) {
+      while (1) switch (_context17.prev = _context17.next) {
+        case 0:
+          if (!(forcar && !confirm('A versão do seu ISO é diferente da testada. Aplicar mesmo assim?'))) {
+            _context17.next = 2;
+            break;
+          }
+          return _context17.abrupt("return");
+        case 2:
+          _context17.next = 4;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee16() {
+            return _regeneratorRuntime().wrap(function _callee16$(_context16) {
+              while (1) switch (_context16.prev = _context16.next) {
+                case 0:
+                  _context16.next = 2;
+                  return api('/api/kits/aplicar', {
+                    kit: kit,
+                    onde: onde,
+                    nome: nome,
+                    forcar: forcar
+                  });
+                case 2:
+                  aviso('Aplicando o kit no pendrive…');
+                  vigiar();
+                case 4:
+                case "end":
+                  return _context16.stop();
+              }
+            }, _callee16);
+          })));
+        case 4:
+        case "end":
+          return _context17.stop();
+      }
+    }, _callee17);
+  }));
+  return _aplicar.apply(this, arguments);
+}
+function desfazer(_x13, _x14) {
+  return _desfazer.apply(this, arguments);
+}
+function _desfazer() {
+  _desfazer = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee19(kit, nome) {
+    return _regeneratorRuntime().wrap(function _callee19$(_context19) {
+      while (1) switch (_context19.prev = _context19.next) {
+        case 0:
+          if (!confirm('Voltar o ISO como era antes do patch?')) {
+            _context19.next = 3;
+            break;
+          }
+          _context19.next = 3;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee18() {
+            return _regeneratorRuntime().wrap(function _callee18$(_context18) {
+              while (1) switch (_context18.prev = _context18.next) {
+                case 0:
+                  _context18.next = 2;
+                  return api('/api/kits/desfazer', {
+                    kit: kit,
+                    nome: nome
+                  });
+                case 2:
+                  aviso('✔ ISO voltou ao original');
+                case 3:
+                case "end":
+                  return _context18.stop();
+              }
+            }, _callee18);
+          })));
+        case 3:
+        case "end":
+          return _context19.stop();
+      }
+    }, _callee19);
+  }));
+  return _desfazer.apply(this, arguments);
+}
+function desligarDns() {
+  return _desligarDns.apply(this, arguments);
+} // ---------- games online (catálogo do notebook, via /api/online da central) ----------
+function _desligarDns() {
+  _desligarDns = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee21() {
+    return _regeneratorRuntime().wrap(function _callee21$(_context21) {
+      while (1) switch (_context21.prev = _context21.next) {
+        case 0:
+          _context21.next = 2;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee20() {
+            return _regeneratorRuntime().wrap(function _callee20$(_context20) {
+              while (1) switch (_context20.prev = _context20.next) {
+                case 0:
+                  _context20.next = 2;
+                  return api('/api/kits/desligar-dns', {});
+                case 2:
+                  _context20.next = 4;
+                  return carregarEstado();
+                case 4:
+                  carregarKits();
+                case 5:
+                case "end":
+                  return _context20.stop();
+              }
+            }, _callee20);
+          })));
+        case 2:
+        case "end":
+          return _context21.stop();
+      }
+    }, _callee21);
+  }));
+  return _desligarDns.apply(this, arguments);
+}
+var vigiandoOnline = null;
+function cartaoOnline(j, nuvem) {
+  var n = ref(j);
+  var capa = j.capa ? "<img loading=\"lazy\" src=\"/api/capa/".concat(encodeURIComponent(j.serial || j.id), ".jpg\" onerror=\"this.outerHTML='<div class=semcapa>sem capa</div>'\">") : '<div class="semcapa">sem capa</div>';
+  var acao = nuvem ? '🌐 roda pela nuvem, direto do servidor — é só entrar no jogo' : j.instalado ? '<span class="ok">✅ já está no pendrive</span>' : j.existe ? "<button class=\"b v\" onclick=\"instalarOnline(J[".concat(n, "].id)\">\uD83D\uDCE4 enviar ISO para o pendrive</button>") : '<span class="nao">— o notebook já não tem esse ISO</span>';
+  return "<div class=\"jogo\">".concat(capa, "<div class=\"i\"><div class=\"t\">").concat(esc(j.nome), "</div>\n    <div class=\"c\">").concat(esc(j.serial || j.id), " \xB7 ").concat(mb(j.tamanho || 0)).concat(j.dns ? ' · DNS ' + esc(j.dns) : '', " \xB7 \uD83D\uDCE1 ").concat(j.vmc ? 'com VMC' : 'DNS embutido', "</div>\n    <div style=\"margin-top:6px\">").concat(acao, "</div></div></div>");
+}
+function carregarOnline() {
+  return _carregarOnline.apply(this, arguments);
+}
+function _carregarOnline() {
+  _carregarOnline = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee22() {
+    var c, fila, f;
+    return _regeneratorRuntime().wrap(function _callee22$(_context22) {
+      while (1) switch (_context22.prev = _context22.next) {
+        case 0:
+          clearTimeout(vigiandoOnline);
+          _context22.next = 3;
+          return tentar(function () {
+            return api('/api/online');
+          });
+        case 3:
+          c = _context22.sent;
+          if (c) {
+            _context22.next = 6;
+            break;
+          }
+          return _context22.abrupt("return");
+        case 6:
+          fila = [];
+          if (c.nuvem) {
+            _context22.next = 15;
+            break;
+          }
+          _context22.next = 10;
+          return tentar(function () {
+            return api('/api/online/fila');
+          });
+        case 10:
+          f = _context22.sent;
+          fila = f && f.fila || [];
+          $('#onlineLivre').innerHTML = f && f.total ? "\uD83D\uDCBE pendrive da box: ".concat(mb(f.livre), " livres") + (fila.length ? " \xB7 \u23F3 ".concat(fila.length > 1 ? fila.length + ' na fila' : esc(fila[0]) + ' (copiando…)') : ' · fila vazia') : "<span class=\"nao\">\u26A0 notebook fora do ar: ".concat(esc(f && f.erro || 'a loja (8770) não responde'), "</span>");
+          _context22.next = 16;
+          break;
+        case 15:
+          $('#onlineLivre').innerHTML = '🌐 <b>modo nuvem</b>: os ISOs ficam no servidor de rodrigoflix e o PS2 puxa pela internet com a sua chave — o jogo aparece na TV em segundos, sem instalar nada.';
+        case 16:
+          $('#onlineListaNg').innerHTML = (c.online || []).map(function (j) {
+            return cartaoOnline(j, c.nuvem);
+          }).join('') || '<div class="p">Nenhum jogo online no catálogo (a varredura dos grupos roda no notebook).</div>';
+          if (fila.length) vigiandoOnline = setTimeout(carregarOnline, 3000);
+        case 18:
+        case "end":
+          return _context22.stop();
+      }
+    }, _callee22);
+  }));
+  return _carregarOnline.apply(this, arguments);
+}
+function instalarOnline(_x15) {
+  return _instalarOnline.apply(this, arguments);
+}
+function _instalarOnline() {
+  _instalarOnline = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee24(id) {
+    return _regeneratorRuntime().wrap(function _callee24$(_context24) {
+      while (1) switch (_context24.prev = _context24.next) {
+        case 0:
+          _context24.next = 2;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee23() {
+            var r;
+            return _regeneratorRuntime().wrap(function _callee23$(_context23) {
+              while (1) switch (_context23.prev = _context23.next) {
+                case 0:
+                  _context23.next = 2;
+                  return api('/api/online/instalar', {
+                    id: id
+                  });
+                case 2:
+                  r = _context23.sent;
+                  aviso(r.ok ? '📥 na fila da loja: o ISO vai para o pendrive da box' : '⚠ ' + r.msg, 8);
+                  carregarOnline();
+                case 5:
+                case "end":
+                  return _context23.stop();
+              }
+            }, _callee23);
+          })));
+        case 2:
+        case "end":
+          return _context24.stop();
+      }
+    }, _callee24);
+  }));
+  return _instalarOnline.apply(this, arguments);
+}
+function enviarKit() {
+  return _enviarKit.apply(this, arguments);
+} // ---------- arquivos ----------
+function _enviarKit() {
+  _enviarKit = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee26() {
+    var arquivos, _i2, _$$files2, f, b, s, i, versoes, iso, doIso, dados;
+    return _regeneratorRuntime().wrap(function _callee26$(_context26) {
+      while (1) switch (_context26.prev = _context26.next) {
+        case 0:
+          arquivos = [];
+          _i2 = 0, _$$files2 = $('#kArquivos').files;
+        case 2:
+          if (!(_i2 < _$$files2.length)) {
+            _context26.next = 18;
+            break;
+          }
+          f = _$$files2[_i2];
+          if (!(f.size > 70 << 20)) {
+            _context26.next = 7;
+            break;
+          }
+          aviso('⚠ ' + f.name + ' é grande demais');
+          return _context26.abrupt("return");
+        case 7:
+          _context26.t0 = Uint8Array;
+          _context26.next = 10;
+          return f.arrayBuffer();
+        case 10:
+          _context26.t1 = _context26.sent;
+          b = new _context26.t0(_context26.t1);
+          s = '';
+          for (i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+          arquivos.push({
+            nome: f.name,
+            dados: btoa(s)
+          });
+        case 15:
+          _i2++;
+          _context26.next = 2;
+          break;
+        case 18:
+          versoes = [];
+          iso = $('#kVersao').value;
+          doIso = jogos.box.find(function (x) {
+            return x.nome === iso;
+          });
+          if (doIso && !$('#kCodigo').value.trim()) $('#kCodigo').value = doIso.codigo;
+          dados = {
+            codigo: $('#kCodigo').value.trim(),
+            titulo: $('#kTitulo').value.trim(),
+            dns: $('#kDns').value.trim(),
+            servidor: $('#kServidor').value.trim(),
+            autor: $('#kAutor').value.trim(),
+            notas: $('#kNotas').value.trim(),
+            arquivos: arquivos,
+            versoes: versoes,
+            iso: iso
+          };
+          _context26.next = 25;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee25() {
+            var r;
+            return _regeneratorRuntime().wrap(function _callee25$(_context25) {
+              while (1) switch (_context25.prev = _context25.next) {
+                case 0:
+                  _context25.next = 2;
+                  return api('/api/kits/enviar', dados);
+                case 2:
+                  r = _context25.sent;
+                  aviso('✔ ' + r.msg, 7);
+                case 4:
+                case "end":
+                  return _context25.stop();
+              }
+            }, _callee25);
+          })));
+        case 25:
+        case "end":
+          return _context26.stop();
+      }
+    }, _callee26);
+  }));
+  return _enviarKit.apply(this, arguments);
+}
+var ehBox = function ehBox() {
+  return $('#fonte').value === 'box';
+};
+var raizDe = function raizDe(v) {
+  return v === 'box' ? '' : v;
+};
+function juntar(a, b) {
+  return ehBox() ? a ? a + '/' + b : b : a.endsWith('/') ? a + b : a + '/' + b;
+}
+function abrir(_x16) {
+  return _abrir.apply(this, arguments);
+}
+function _abrir() {
+  _abrir = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee27(c) {
+    var r;
+    return _regeneratorRuntime().wrap(function _callee27$(_context27) {
+      while (1) switch (_context27.prev = _context27.next) {
+        case 0:
+          atual = c;
+          $('#caminho').textContent = ehBox() ? '/' + c : c;
+          $('#fonteInfo').textContent = ehBox() ? '' : 'Pelo PS2: abra o navegador (OPL → Apps → PS2 Henbox). Pastas do sistema, do exploit e do OPL ficam protegidas.';
+          $('#lista').innerHTML = '<div class="p">carregando…</div>';
+          _context27.next = 6;
+          return tentar(function () {
+            return api((ehBox() ? '/api/box/listar?c=' : '/api/ps2/listar?c=') + encodeURIComponent(c));
+          });
+        case 6:
+          r = _context27.sent;
+          if (r) {
+            _context27.next = 10;
+            break;
+          }
+          $('#lista').innerHTML = '';
+          return _context27.abrupt("return");
+        case 10:
+          $('#lista').innerHTML = r.itens.map(function (i, k) {
+            return "<div class=\"it ".concat(i.pasta ? 'pasta' : '', "\">\n    <span class=\"n\" onclick=\"").concat(i.pasta ? "abrir(juntar(atual, itens[".concat(k, "].nome))") : '', "\">").concat(i.pasta ? '📁' : '📄', " ").concat(esc(i.nome), "</span>\n    <span class=\"z\">").concat(i.pasta ? '' : mb(i.tam), "</span>\n    ").concat(i.pasta ? '' : "<button class=\"b s\" onclick=\"baixar(".concat(k, ")\">\u2B07</button>"), "\n    ").concat(ehBox() ? "<button class=\"b s\" onclick=\"renomear(".concat(k, ")\">\u270F</button>") : '', "\n    ").concat(i.protegido ? '🔒' : "<button class=\"b s r\" onclick=\"apagar(".concat(k, ")\">\uD83D\uDDD1</button>"), "</div>");
+          }).join('') || '<div class="p">pasta vazia</div>';
+          window.itens = r.itens;
+        case 12:
+        case "end":
+          return _context27.stop();
+      }
+    }, _callee27);
+  }));
+  return _abrir.apply(this, arguments);
+}
+function subir() {
+  if (ehBox()) abrir(atual.split('/').slice(0, -1).join('/'));else {
+    var p = atual.replace(/\/$/, '');
+    var i = p.lastIndexOf('/');
+    abrir(i > p.indexOf(':') + 1 ? p.slice(0, i) : p.slice(0, p.indexOf(':') + 2));
+  }
+}
+function baixar(k) {
+  var c = juntar(atual, itens[k].nome);
+  var url = (ehBox() ? '/api/box/baixar?c=' : '/api/ps2/baixar?c=') + encodeURIComponent(c);
+  if (window.Henbox && Henbox.baixar) {
+    Henbox.baixar(location.origin + url, itens[k].nome);
+    aviso('⬇ Baixando para a pasta Download do celular');
+  } else location.href = url;
+  if (!ehBox()) aviso('O PS2 está lendo o arquivo… o download começa quando ele terminar.', 6);
+}
+function apagar(_x17) {
+  return _apagar.apply(this, arguments);
+}
+function _apagar() {
+  _apagar = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee29(k) {
+    var i, c;
+    return _regeneratorRuntime().wrap(function _callee29$(_context29) {
+      while (1) switch (_context29.prev = _context29.next) {
+        case 0:
+          i = itens[k];
+          if (confirm("Apagar ".concat(i.pasta ? 'a pasta' : '', " \"").concat(i.nome, "\"?") + (i.pasta && !ehBox() ? ' (só pasta vazia no PS2)' : ''))) {
+            _context29.next = 3;
+            break;
+          }
+          return _context29.abrupt("return");
+        case 3:
+          c = juntar(atual, i.nome);
+          _context29.next = 6;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee28() {
+            return _regeneratorRuntime().wrap(function _callee28$(_context28) {
+              while (1) switch (_context28.prev = _context28.next) {
+                case 0:
+                  _context28.next = 2;
+                  return api(ehBox() ? '/api/box/apagar' : '/api/ps2/apagar', {
+                    c: c,
+                    pasta: i.pasta
+                  });
+                case 2:
+                  abrir(atual);
+                case 3:
+                case "end":
+                  return _context28.stop();
+              }
+            }, _callee28);
+          })));
+        case 6:
+        case "end":
+          return _context29.stop();
+      }
+    }, _callee29);
+  }));
+  return _apagar.apply(this, arguments);
+}
+function renomear(_x18) {
+  return _renomear.apply(this, arguments);
+}
+function _renomear() {
+  _renomear = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee31(k) {
+    var novo;
+    return _regeneratorRuntime().wrap(function _callee31$(_context31) {
+      while (1) switch (_context31.prev = _context31.next) {
+        case 0:
+          novo = prompt('Novo nome:', itens[k].nome);
+          if (novo) {
+            _context31.next = 3;
+            break;
+          }
+          return _context31.abrupt("return");
+        case 3:
+          _context31.next = 5;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee30() {
+            return _regeneratorRuntime().wrap(function _callee30$(_context30) {
+              while (1) switch (_context30.prev = _context30.next) {
+                case 0:
+                  _context30.next = 2;
+                  return api('/api/box/renomear', {
+                    c: juntar(atual, itens[k].nome),
+                    novo: novo
+                  });
+                case 2:
+                  abrir(atual);
+                case 3:
+                case "end":
+                  return _context30.stop();
+              }
+            }, _callee30);
+          })));
+        case 5:
+        case "end":
+          return _context31.stop();
+      }
+    }, _callee31);
+  }));
+  return _renomear.apply(this, arguments);
+}
+function novaPasta() {
+  return _novaPasta.apply(this, arguments);
+}
+function _novaPasta() {
+  _novaPasta = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee33() {
+    var n;
+    return _regeneratorRuntime().wrap(function _callee33$(_context33) {
+      while (1) switch (_context33.prev = _context33.next) {
+        case 0:
+          n = prompt('Nome da pasta:');
+          if (n) {
+            _context33.next = 3;
+            break;
+          }
+          return _context33.abrupt("return");
+        case 3:
+          _context33.next = 5;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee32() {
+            return _regeneratorRuntime().wrap(function _callee32$(_context32) {
+              while (1) switch (_context32.prev = _context32.next) {
+                case 0:
+                  _context32.next = 2;
+                  return api(ehBox() ? '/api/box/pasta' : '/api/ps2/pasta', {
+                    c: juntar(atual, n)
+                  });
+                case 2:
+                  abrir(atual);
+                case 3:
+                case "end":
+                  return _context32.stop();
+              }
+            }, _callee32);
+          })));
+        case 5:
+        case "end":
+          return _context33.stop();
+      }
+    }, _callee33);
+  }));
+  return _novaPasta.apply(this, arguments);
+}
+function enviarArquivo(_x19) {
+  return _enviarArquivo.apply(this, arguments);
+} // ---------- controle ----------
+function _enviarArquivo() {
+  _enviarArquivo = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee35(inp) {
+    var f, c;
+    return _regeneratorRuntime().wrap(function _callee35$(_context35) {
+      while (1) switch (_context35.prev = _context35.next) {
+        case 0:
+          f = inp.files[0];
+          inp.value = '';
+          if (f) {
+            _context35.next = 4;
+            break;
+          }
+          return _context35.abrupt("return");
+        case 4:
+          c = juntar(atual, f.name);
+          if (!((window.itens || []).some(function (i) {
+            return i.nome === f.name;
+          }) && !confirm("\"".concat(f.name, "\" j\xE1 existe aqui. Substituir?")))) {
+            _context35.next = 7;
+            break;
+          }
+          return _context35.abrupt("return");
+        case 7:
+          aviso("Enviando ".concat(f.name, " (").concat(mb(f.size), ")\u2026"), 60);
+          _context35.next = 10;
+          return tentar( /*#__PURE__*/_asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee34() {
+            var r, j;
+            return _regeneratorRuntime().wrap(function _callee34$(_context34) {
+              while (1) switch (_context34.prev = _context34.next) {
+                case 0:
+                  _context34.next = 2;
+                  return fetch((ehBox() ? '/api/box/enviar?c=' : '/api/ps2/enviar?c=') + encodeURIComponent(c), {
+                    method: 'POST',
+                    body: f
+                  });
+                case 2:
+                  r = _context34.sent;
+                  _context34.next = 5;
+                  return r.json();
+                case 5:
+                  j = _context34.sent;
+                  if (!j.erro) {
+                    _context34.next = 8;
+                    break;
+                  }
+                  throw new Error(j.erro);
+                case 8:
+                  aviso(ehBox() ? '✔ Enviado' : 'Na box; o PS2 está gravando…');
+                  if (!ehBox()) vigiar();
+                  abrir(atual);
+                case 11:
+                case "end":
+                  return _context34.stop();
+              }
+            }, _callee34);
+          })));
+        case 10:
+        case "end":
+          return _context35.stop();
+      }
+    }, _callee35);
+  }));
+  return _enviarArquivo.apply(this, arguments);
+}
+var fila = [],
+  enviando = false;
+function ev(e) {
+  fila.push(e);
+  despachar();
+}
+function despachar() {
+  return _despachar.apply(this, arguments);
+}
+function _despachar() {
+  _despachar = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee36() {
+    var lote, _i4, _fila$splice2, e, ult, r;
+    return _regeneratorRuntime().wrap(function _callee36$(_context36) {
+      while (1) switch (_context36.prev = _context36.next) {
+        case 0:
+          if (!(enviando || !fila.length)) {
+            _context36.next = 2;
+            break;
+          }
+          return _context36.abrupt("return");
+        case 2:
+          enviando = true;
+          // junta os movimentos seguidos num só (o Wi-Fi não aguenta um pedido por toque)
+          lote = [];
+          for (_i4 = 0, _fila$splice2 = fila.splice(0); _i4 < _fila$splice2.length; _i4++) {
+            e = _fila$splice2[_i4];
+            ult = lote[lote.length - 1];
+            if (e.tipo === 'mover' && ult && ult.tipo === 'mover') {
+              ult.dx += e.dx;
+              ult.dy += e.dy;
+            } else lote.push(_objectSpread({}, e));
+          }
+          _context36.prev = 5;
+          _context36.next = 8;
+          return api('/api/controle', lote);
+        case 8:
+          r = _context36.sent;
+          if (!r.ok) aviso('⚠ ' + r.resposta);
+          _context36.next = 15;
+          break;
+        case 12:
+          _context36.prev = 12;
+          _context36.t0 = _context36["catch"](5);
+          aviso('⚠ ' + _context36.t0.message);
+        case 15:
+          enviando = false;
+          if (fila.length) setTimeout(despachar, 30);
+        case 17:
+        case "end":
+          return _context36.stop();
+      }
+    }, _callee36, null, [[5, 12]]);
+  }));
+  return _despachar.apply(this, arguments);
+}
+function botao(nome) {
+  ev({
+    tipo: 'botao',
+    nome: nome
+  });
+}
+function digitar() {
+  var t = $('#texto').value;
+  if (t) ev({
+    tipo: 'texto',
+    texto: t
+  });
+  $('#texto').value = '';
+}
+$('#texto').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') {
+    digitar();
+    ev({
+      tipo: 'tecla',
+      nome: 'enter'
+    });
+  }
+});
+(function () {
+  var pad = $('#pad');
+  var ult = null,
+    moveu = 0,
+    inicio = 0,
+    dedos = 0;
+  var VEL = 1.6;
+  pad.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    dedos = e.touches.length;
+    var t = e.touches[0];
+    ult = {
+      x: t.clientX,
+      y: t.clientY
+    };
+    moveu = 0;
+    inicio = Date.now();
+  }, {
+    passive: false
+  });
+  pad.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    var t = e.touches[0];
+    if (!ult) return;
+    var dx = t.clientX - ult.x,
+      dy = t.clientY - ult.y;
+    ult = {
+      x: t.clientX,
+      y: t.clientY
+    };
+    moveu += Math.abs(dx) + Math.abs(dy);
+    if (e.touches.length >= 2 || dedos >= 2) ev({
+      tipo: 'rolar',
+      dy: dy * -4
+    });else ev({
+      tipo: 'mover',
+      dx: dx * VEL,
+      dy: dy * VEL
+    });
+  }, {
+    passive: false
+  });
+  pad.addEventListener('touchend', function (e) {
+    e.preventDefault();
+    if (moveu < 8 && Date.now() - inicio < 300 && dedos === 1) ev({
+      tipo: 'clique'
+    });
+    if (!e.touches.length) dedos = 0;
+  }, {
+    passive: false
+  });
+  // no computador: mouse
+  var apertado = false;
+  pad.addEventListener('mousedown', function (e) {
+    apertado = true;
+    ult = {
+      x: e.clientX,
+      y: e.clientY
+    };
+    moveu = 0;
+  });
+  pad.addEventListener('mousemove', function (e) {
+    if (!apertado) return;
+    var dx = e.clientX - ult.x,
+      dy = e.clientY - ult.y;
+    ult = {
+      x: e.clientX,
+      y: e.clientY
+    };
+    moveu += Math.abs(dx) + Math.abs(dy);
+    ev({
+      tipo: 'mover',
+      dx: dx * VEL,
+      dy: dy * VEL
+    });
+  });
+  pad.addEventListener('mouseup', function () {
+    apertado = false;
+    if (moveu < 4) ev({
+      tipo: 'clique'
+    });
+  });
+})();
+
+// ---------- tarefas ----------
+var vigiando = null;
+function vigiar() {
+  return _vigiar.apply(this, arguments);
+}
+function _vigiar() {
+  _vigiar = _asyncToGenerator( /*#__PURE__*/_regeneratorRuntime().mark(function _callee37() {
+    var ts, recentes;
+    return _regeneratorRuntime().wrap(function _callee37$(_context37) {
+      while (1) switch (_context37.prev = _context37.next) {
+        case 0:
+          clearTimeout(vigiando);
+          _context37.next = 3;
+          return api('/api/tarefas').catch(function () {
+            return [];
+          });
+        case 3:
+          ts = _context37.sent;
+          recentes = ts.filter(function (t) {
+            return t.estado === 'rodando' || t.fim && Date.now() / 1000 - t.fim < 90;
+          });
+          $('#tarefas').innerHTML = recentes.map(function (t) {
+            return "<div class=\"tf ".concat(t.estado, "\"><b>").concat(esc(t.titulo), "</b> \u2014 ").concat(t.estado === 'rodando' ? t.pct + '%' : t.estado === 'pronto' ? '✔ pronto' : '✖ erro', "\n    <div>").concat(esc(t.msg), "</div>").concat(t.estado === 'rodando' ? "<div class=\"barra\"><i style=\"width:".concat(t.pct, "%\"></i></div>") : '', "</div>");
+          }).join('');
+          if (ts.some(function (t) {
+            return t.estado === 'rodando';
+          })) vigiando = setTimeout(vigiar, 1500);else {
+            carregarJogos();
+            carregarEstado();
+            vigiando = setTimeout(function () {
+              return $('#tarefas').innerHTML = '';
+            }, 60000);
+          }
+        case 7:
+        case "end":
+          return _context37.stop();
+      }
+    }, _callee37);
+  }));
+  return _vigiar.apply(this, arguments);
+}
+carregarEstado();
+carregarJogos();
+vigiar();
+setInterval(carregarEstado, 15000);
+if (window.Henbox) procurarCelular();else $('#celInfo').textContent = 'Abra pelo app PS2 Henbox no celular para ver e jogar os ISOs dele.';
+</script>
+</body>
+</html>

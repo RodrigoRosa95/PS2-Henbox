@@ -181,6 +181,11 @@ def sha256_arquivo(caminho):
 
 def atualizar_navegador(pasta_ps2):
     """Baixa o navegador.elf publicado no servidor se for diferente do desta box. True se trocou."""
+    try:   # "navegador_local": true no config.json = testando um navegador.elf só nesta box (24/10/2026)
+        if json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json'))).get('navegador_local'):
+            return False
+    except (OSError, ValueError):
+        pass
     try:
         st, _, dados = pedir('GET', '/atualizacao/versao.json', timeout=20)
         if st != 200:

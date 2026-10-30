@@ -10,6 +10,8 @@
 # Nos dois modos: DHCP no cabo dando só o IP do PS2 (o OPL costuma usar DHCP) e a box continua atendendo também no IP
 # que tinha no cabo (as configurações do PS2 apontam para ele: Samba do OPL, servidor do navegador).
 # Desliga sozinho quando o cabo sai. Log: /data/local/henbox-rede/henbox-root.log. Forçar: echo desligado > .../modo
+# Evento online: DNS do evento para o PS2 na janela de ~/ps2nav/dns-evento (dns_evento); com o PS2 no cabo, o
+# captura-jogo.py grava as partidas online em capturas/ (só PS2 ↔ internet, para achar o placar).
 # Também mantém o motor do xeRAbora (conquistas, UDP 18194) ligado, se o app estiver instalado.
 # Chamado pelo iniciar.sh (su) a cada início; só uma cópia roda (pid em .../pid).
 H=/data/data/com.termux/files/home/ps2nav
@@ -57,15 +59,22 @@ ligar() {
         MODO=ponte
         echo 1 > /proc/sys/net/ipv4/conf/wlan0/proxy_arp
         echo 1 > /proc/sys/net/ipv4/conf/eth0/proxy_arp
-        # endereço da box no cabo (mesmo do Wi-Fi) como /32: sem rota de rede, a faixa continua sendo do Wi-Fi
-        ip addr add $WIP/32 dev eth0 label eth0:$MARCA
+        # endereço da box no cabo (mesmo do Wi-Fi) como /32: sem rota de rede, a faixa continua sendo do Wi-Fi.
+        # SEM rótulo (23/10/2026): o dnsmasq 2.51 só enxerga o endereço com o nome exato "eth0" — com eth0:henbox ele
+        # recusava o DHCP do PS2 ("DHCP packet received on eth0 which has no address"); sai pelo 4º campo do estado
+        ip addr add $WIP/32 dev eth0
+        END=$WIP/32
         ip route add $PS2/32 dev eth0 table main
         [ -n "$TAB" ] && ip route add $PS2/32 dev eth0 table $TAB
         ip rule add to $PS2/32 lookup main prio 4999
+        # 24/10/2026: o roteador não devolve as respostas da internet para o IP do PS2 atrás da box (o pacote saía com
+        # .230 pelo Wi-Fi e nada voltava) → sai com o IP da box; o proxy ARP segue valendo para a rede de casa
+        iptables -t nat -A POSTROUTING -s $PS2/32 -o wlan0 -j MASQUERADE
         DGW=$GW
     else
         MODO=nat
-        ip addr add $PGW/$PPFX dev eth0 label eth0:$MARCA
+        ip addr add $PGW/$PPFX dev eth0
+        END=$PGW/$PPFX
         iptables -t nat -A POSTROUTING -s $PS2/32 -o wlan0 -j MASQUERADE
         ip rule add to $PS2/32 lookup main prio 4999
         DGW=$PGW
@@ -76,7 +85,8 @@ ligar() {
     dnsmasq --interface=eth0 --bind-interfaces --except-interface=lo --port=0 --dhcp-authoritative \
         --dhcp-range=$PS2,$PS2,$MASK,12h --dhcp-option=3,$DGW --dhcp-option=6,${GW:-8.8.8.8} \
         --dhcp-leasefile=$EST/dhcp.leases --pid-file=$EST/dnsmasq.pid 2>> $LOG
-    echo "$MODO $PS2 $WIP" > $EST/estado; chmod 644 $EST/estado
+    echo "$MODO $PS2 $WIP $END" > $EST/estado; chmod 644 $EST/estado
+    # gravação das partidas (captura-jogo.py) DESLIGADA em 24/10/2026 a pedido do usuário (placar por pacote cancelado)
     log "LIGADO modo $MODO: PS2 $PS2 no cabo, box $WIP no Wi-Fi (gateway $GW, tabela ${TAB:-main})"
 }
 
@@ -84,8 +94,11 @@ desligar() {
     motivo=$1
     [ -f $EST/dnsmasq.pid ] && kill $(cat $EST/dnsmasq.pid) 2>/dev/null
     rm -f $EST/dnsmasq.pid
+    [ -f $EST/captura.pid ] && kill $(cat $EST/captura.pid) 2>/dev/null
+    rm -f $EST/captura.pid
     set -- $(cat $EST/estado 2>/dev/null)
     PS2=$2
+    [ -n "$4" ] && ip addr del $4 dev eth0 2>/dev/null   # o endereço sem rótulo (ver ligar)
     for a in $(ip -4 -o addr show eth0 | grep "eth0:$MARCA" | sed -n 's/.* inet \([0-9.]*\/[0-9]*\).*/\1/p'); do
         ip addr del $a dev eth0
     done
@@ -100,8 +113,38 @@ desligar() {
     iptables -D FORWARD -i wlan0 -o eth0 -j ACCEPT 2>/dev/null
     echo 0 > /proc/sys/net/ipv4/conf/wlan0/proxy_arp
     echo 0 > /proc/sys/net/ipv4/conf/eth0/proxy_arp
+    A=$(cat $EST/dns-evento-ativo 2>/dev/null)
+    [ -n "$A" ] && dns_regra -D "$(cat $EST/dns-evento-ps2 2>/dev/null)" $A
+    echo > $EST/dns-evento-ativo
     rm -f $EST/estado
     log "desligado ($motivo)"
+}
+
+# Evento online (23/10/2026): ~/ps2nav/dns-evento ("IP INÍCIO FIM", escrito pelo videos.py com os eventos do notebook).
+# Na janela, as consultas de DNS do PS2 no cabo vão para o DNS do evento (DNAT da porta 53): vale mesmo com DNS fixo
+# na configuração de rede do jogo. Fora da janela, sem PS2 no cabo ou sem arquivo: regra retirada.
+dns_regra() {   # dns_regra -A|-D PS2 DNS
+    for pr in udp tcp; do
+        iptables -t nat $1 PREROUTING -i eth0 -s $2/32 -p $pr --dport 53 -j DNAT --to-destination $3:53 2>/dev/null
+    done
+}
+dns_evento() {
+    set -- $(cat $H/dns-evento 2>/dev/null)
+    DNS=$1; INI=$2; FIM=$3; AGORA=$(date +%s)
+    ATIVO=$(cat $EST/dns-evento-ativo 2>/dev/null); PS2=$(cut -d' ' -f2 $EST/estado 2>/dev/null)
+    QUER=""
+    [ -f $EST/estado ] && [ -n "$DNS" ] && [ "$AGORA" -ge "${INI:-0}" ] && [ "$AGORA" -lt "${FIM:-0}" ] && QUER=$DNS
+    [ "$QUER" = "$ATIVO" ] && return
+    if [ -n "$ATIVO" ]; then
+        dns_regra -D "$(cat $EST/dns-evento-ps2 2>/dev/null)" $ATIVO
+        log "DNS do evento desligado ($ATIVO)"
+    fi
+    if [ -n "$QUER" ]; then
+        dns_regra -A $PS2 $QUER
+        echo $PS2 > $EST/dns-evento-ps2
+        log "DNS do evento ligado: PS2 $PS2 → $QUER"
+    fi
+    echo "$QUER" > $EST/dns-evento-ativo; chmod 644 $EST/dns-evento-ativo
 }
 
 XERA=io.github.hacan359.xerabora
@@ -111,18 +154,37 @@ xerabora() {   # motor das conquistas: só o serviço (entra logado com o token 
     am start-foreground-service -n $XERA/.EngineService >/dev/null 2>&1 && log "xeRAbora: motor religado"
 }
 
+# Rede padrão (24/10/2026): com o PS2 no cabo, o Android dá nota 70 ao Ethernet (Wi-Fi 60) e o põe como rede padrão —
+# mas ele não tem rota para fora nem DNS, e os apps da box (Loja → notebook, HTTPS, Termux) ficavam "fora do alcance".
+# Com o modo ligado, devolve a rede padrão ao Wi-Fi (netId pela marca da regra "lookup wlan0").
+rede_padrao_wifi() {
+    [ "$(ip rule | sed -n 's/^22000:.* lookup \([^ ]*\).*/\1/p' | head -1)" = wlan0 ] && return
+    M=$(ip rule | sed -n 's/.*fwmark 0x\([0-9a-f]*\)\/0x1ffff iif lo lookup wlan0.*/\1/p' | head -1)
+    [ -n "$M" ] || return
+    ndc network default set $((0x$M & 0xffff)) >/dev/null 2>&1 && log "rede padrão devolvida ao Wi-Fi (netId $((0x$M & 0xffff)))"
+}
+
 log "vigia do cabo iniciado (pid $$)"
 n=0
 desligar "início" >/dev/null 2>&1
 espera=0
+sem_sinal=0
 while true; do
     car=$(cat /sys/class/net/eth0/carrier 2>/dev/null)
     pedido=$(cat $EST/modo 2>/dev/null)
     if [ -f $EST/estado ]; then
-        if [ "$car" != 1 ] || [ "$pedido" = desligado ]; then
-            desligar "cabo desconectado ou modo desligado"
-        elif ! ip -4 -o addr show eth0 | grep -q "eth0:$MARCA"; then   # o Android tirou os endereços: refaz
-            desligar "endereços sumiram"; ligar
+        # queda curta do sinal = o jogo/OPL reiniciando a placa de rede do PS2 (23/10/2026): só desliga depois de 90 s
+        # sem sinal; desligar na hora fazia o jogo pedir IP nos 30 s de espera do religar e desistir
+        if [ "$car" = 1 ]; then sem_sinal=0; else sem_sinal=$((sem_sinal + 5)); fi
+        if [ "$pedido" = desligado ] || [ $sem_sinal -ge 90 ]; then
+            desligar "cabo desconectado ou modo desligado"; sem_sinal=0
+        elif ! ip -4 -o addr show eth0 | grep -q " $(cut -d' ' -f4 $EST/estado) "; then
+            # o Android tira o endereço sem rótulo a cada ~30 s (o DHCP dele no cabo desiste): só recoloca o endereço e a
+            # rota do PS2, sem derrubar o dnsmasq nem o gravador (desligar/ligar a cada 30 s atrapalhava o DHCP do jogo)
+            set -- $(cat $EST/estado)
+            ip addr add $4 dev eth0 2>/dev/null
+            ip route add $2/32 dev eth0 table main 2>/dev/null
+            TAB=$(tab_wifi); [ -n "$TAB" ] && ip route add $2/32 dev eth0 table $TAB 2>/dev/null
         fi
     else
         e=$(v4 eth0 "eth0:$MARCA")
@@ -136,6 +198,8 @@ while true; do
             espera=0
         fi
     fi
+    [ -f $EST/estado ] && rede_padrao_wifi
+    dns_evento
     n=$((n + 1)); [ $((n % 3)) = 1 ] && xerabora
     date +%s > $EST/vivo; chmod 644 $EST/vivo
     [ $(stat -c %s $LOG 2>/dev/null || echo 0) -gt 200000 ] && mv $LOG $LOG.1

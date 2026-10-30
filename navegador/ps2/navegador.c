@@ -31,6 +31,15 @@
  *   host:aviso.raw   frase falada (ex.: "Sua cópia foi concluída."), tocada uma vez quando o contador nos bits 16-23
  *                    do cmd do dif.bin muda (23/10/2026)
  *   host:temperatura.txt   escrito pelo PS2 a cada 10 s: °C do sensor do Mechacon ("41.5"), ver temperatura.py
+ * Central do celular (24/10/2026, central.py na TV box):
+ *     op 5 = listar a pasta origem (mc0:/, mc1:/, mass:/...) em destino (host:arquivos/lista.txt): uma linha por item,
+ *            "D\t<nome>\t0" ou "F\t<nome>\t<tamanho>"; op 6 = criar a pasta origem; op 7 = apagar a pasta origem (vazia)
+ *     cmd bit 0x400 = o celular está controlando o cursor: o PS2 lê host:cursor.bin ("PSC1" n:u32 x:u16 y:u16) a
+ *            cada 40 ms e, quando n muda, põe o cursor em x,y (o celular move; o controle do PS2 continua valendo)
+ *     cmd bits 24-31 = número da faixa da música da loja (24/10/2026): mudou → o PS2 solta a música e lê de novo
+ *            host:musica.raw (até 4 MB = ~95 s); o som sai em blocos de 1024 amostras (o anel do audsrv tem só ~50 ms = 4700 bytes; 2048 enchia o anel e calava; com 512 o vaivém com o IOP
+ *            competia com o host: e pesava o cursor, 17/10/2026)
+ *     Os memory cards (rom0:MCMAN/MCSERV) são carregados na entrada, para mc0:/mc1: valerem nas ops 0, 3 e 5–7.
  * Controle: o com fio (porta 1) e o DualShock 4/3 por Bluetooth no adaptador USB, com o mesmo driver e o mesmo
  * pareamento do OPL (o DS4 guarda o endereço do adaptador; no OPL: $EnablePadEmu=1, $PadEmuSettings=257).
  * Mouse e teclado USB: mouse move o cursor (esquerdo = X, direito = O, rodinha rola); teclado digita.
@@ -58,7 +67,12 @@
 #include <fcntl.h>
 extern void fioExit(void);   /* (fileio.h não pode ser incluído no newlib) religa o fio depois de reiniciar o IOP */
 extern int fioFormat(const char *name);   /* formatar o pendrive (op 4): só com o bdmfs_fatfs do PS2 Henbox */
+extern int fioDopen(const char *name);    /* op 5: listar direto pelo fio (o readdir do newlib perde o nome no pendrive) */
+extern int fioDread(int fd, void *buf);
+extern int fioDclose(int fd);
 #include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
 #include <libpad.h>
 #include <gsKit.h>
 #include <dmaKit.h>
@@ -102,6 +116,10 @@ static unsigned int pedido_id = 0, pedido_feito = 0;
 static int pedido_pendente = 0;
 static char exec_elf[129], exec_arg[129];   /* programa do pendrive para abrir ao sair (op 1) */
 static unsigned char pedido_estado = 0, pedido_pct = 0, usb_carregado = 0;
+/* cursor mandado pelo celular (cmd bit 0x400 + host:cursor.bin) */
+static volatile int remoto_ativo = 0, rem_novo = 0, rem_x = 0, rem_y = 0;
+static unsigned int rem_n = 0;
+static int rem_visto = 0;
 
 /* ---------------- som ---------------- */
 #define SOM_HZ 22050
@@ -110,6 +128,7 @@ static int musica_n = 0, clique_n = 0, musica_pos = 0;
 static volatile int musica_ligada = 0, clique_pos = -1;
 static short *aviso = NULL;                 /* frase falada (host:aviso.raw), uma vez por mudança do contador */
 static int aviso_n = 0, aviso_visto = -1;
+static int faixa_vista = -1;                /* faixa da música (bits 24-31 do cmd) */
 static volatile int aviso_pos = -1;
 /* modo vídeo (video.inc.c): pedido pelo notebook com op 2 em pedido.bin */
 static volatile int som_pausado = 0;
@@ -138,13 +157,13 @@ static short *carregar_som(const char *nome, int *amostras)
 
 static void thread_som(void *arg)
 {
-    static short bloco[512] __attribute__((aligned(64)));
+    static short bloco[1024] __attribute__((aligned(64)));
     (void)arg;
     for (;;) {
         int i;
         if (parar_threads) { som_parado = 1; SleepThread(); }
         if (som_pausado) { DelayThread(10000); continue; }
-        for (i = 0; i < 512; i++) {
+        for (i = 0; i < 1024; i++) {
             int v = 0;
             if (musica_ligada && musica_n) { v += musica[musica_pos] / 2; if (++musica_pos >= musica_n) musica_pos = 0; }
             if (clique_pos >= 0 && clique) { v += clique[clique_pos]; if (++clique_pos >= clique_n) clique_pos = -1; }
@@ -222,6 +241,17 @@ static int atualizar_tela(void)
     if (tam < 20 || memcmp(arq, "PST2", 4) != 0) return 0;
     seq = u32le(arq + 4); base = u32le(arq + 8); cmd = u32le(arq + 12);
     if ((cmd & 0xFF) == 1) return 1;
+    {   /* faixa nova: solta a música antiga (a thread de som para de ler antes do free) */
+        int f = (cmd >> 24) & 0xFF;
+        if (faixa_vista >= 0 && f != faixa_vista && musica) {
+            short *velha = musica;
+            musica_ligada = 0; musica_n = 0;
+            DelayThread(100000);   /* > 1 bloco de 1024 amostras (46 ms) */
+            musica = NULL; musica_pos = 0;
+            free(velha);
+        }
+        faixa_vista = f;
+    }
     if ((cmd & 0x100) && !musica && (musica = carregar_som("host:musica.raw", &musica_n)) == NULL) musica_n = 0;
     musica_ligada = (cmd & 0x100) != 0;
     {   /* aviso falado: o contador (bits 16-23) mudou → toca host:aviso.raw. A 1ª leitura só guarda o valor */
@@ -236,6 +266,7 @@ static int atualizar_tela(void)
         }
     }
     if (cmd & 0x200) pedido_pendente = 1;
+    remoto_ativo = (cmd & 0x400) != 0;
     if (seq == minha_seq) return pedido_pendente ? (pedido_pendente = 0, 2) : 0;
     if (base == minha_seq && base != 0 && aplicar(tam) == 0) { minha_seq = seq; return pedido_pendente ? (pedido_pendente = 0, 2) : 0; }
     tam = ler_tela("host:completa.bin", 0);   /* perdi alguma mudança: tela inteira */
@@ -376,6 +407,41 @@ static void copiar_pedido(void)
         pedido_feito = id;
         return;
     }
+    if (op == 5) {   /* listar pasta (explorador do celular; jogos do pendrive ao abrir, 24/10/2026) */
+        /* Pelo fio direto: o driver do pendrive (BDM, iomanX) devolve o item no formato do iomanX — stat de 64 bytes,
+           nome no byte 64 — e o readdir do newlib lê o do ioman (stat de 40, nome no byte 40): no PS2 real os nomes
+           vinham vazios. Aqui: nome no 40; se vazio, no 64 (aí o tipo vem em FIO_S_IFMT, 0x1000 = pasta).
+           O memory card (rom0:MCMAN) responde no formato antigo (FIO_SO_IFDIR 0x10). */
+        static unsigned char ent[320] __attribute__((aligned(64)));
+        int d = fioDopen(origem), out, itens = 0;
+        if (d < 0) { pedido_estado = 4; pedido_feito = id; return; }
+        if ((out = open(destino, O_WRONLY | O_CREAT | O_TRUNC, 0644)) < 0) { fioDclose(d); pedido_estado = 6; pedido_feito = id; return; }
+        for (;;) {
+            char linha[300];
+            const char *nome;
+            unsigned int modo, tam;
+            int pasta;
+            memset(ent, 0, sizeof(ent));
+            if (fioDread(d, ent) <= 0 || itens >= 2000) break;
+            modo = u32le(ent); tam = u32le(ent + 8);
+            nome = (const char *)ent + 40;
+            if (!nome[0]) nome = (const char *)ent + 64;
+            if (!nome[0] || !strcmp(nome, ".") || !strcmp(nome, "..")) continue;
+            pasta = (modo & 0xF000) ? (modo & 0xF000) == 0x1000 : (modo & 0x10) != 0;
+            n = snprintf(linha, sizeof(linha), "%c\t%.255s\t%u\n", pasta ? 'D' : 'F', nome, pasta ? 0 : tam);
+            write(out, linha, n);
+            itens++;
+        }
+        fioDclose(d);
+        close(out);
+        pedido_estado = 2; pedido_pct = 100; pedido_feito = id;
+        return;
+    }
+    if (op == 6 || op == 7) {   /* criar / apagar pasta */
+        pedido_estado = (op == 6 ? mkdir(origem, 0777) : rmdir(origem)) == 0 ? 2 : 4;
+        pedido_pct = 100; pedido_feito = id;
+        return;
+    }
     /* op 0, copiar: numa thread própria (um episódio leva minutos pela USB 1.1; a tela não pode parar) */
     if (copia_ativa) return;   /* o notebook manda um pedido por vez; este volta na próxima leitura */
     strcpy(copia_origem, origem); strcpy(copia_destino, destino);
@@ -424,7 +490,7 @@ static void escrever_temperatura(void)
 static void thread_rede(void *arg)
 {
     unsigned short ult_b = 0xFFFF, ult_t = 0xFFFF;
-    int ult_x = -1, ult_y = -1, desde_escrita = 0, desde_tela = 0, desde_temp = 10000;
+    int ult_x = -1, ult_y = -1, desde_escrita = 0, desde_tela = 0, desde_temp = 10000, desde_cursor = 0;
     (void)arg;
     for (;;) {
         unsigned short b = in_botoes;
@@ -440,9 +506,20 @@ static void thread_rede(void *arg)
             if (r == 2) { copiar_pedido(); escrever_entrada(in_botoes, in_cx, in_cy, 0, 0); }
             desde_tela = 0;
         }
+        if (remoto_ativo && desde_cursor >= 40) {   /* cursor do celular */
+            unsigned char c[12];
+            int fd = open("host:cursor.bin", O_RDONLY), n = 0;
+            if (fd >= 0) { n = read(fd, c, sizeof(c)); close(fd); }
+            if (n == 12 && memcmp(c, "PSC1", 4) == 0) {
+                unsigned int k = u32le(c + 4);
+                if (!rem_visto) { rem_visto = 1; rem_n = k; }   /* a 1ª leitura só guarda (pode ser de outra sessão) */
+                else if (k != rem_n) { rem_n = k; rem_x = u16le(c + 8); rem_y = u16le(c + 10); rem_novo = 1; }
+            }
+            desde_cursor = 0;
+        }
         if (desde_temp >= 10000) { escrever_temperatura(); desde_temp = 0; }
         DelayThread(20000);
-        desde_escrita += 20; desde_tela += 20; desde_temp += 20;
+        desde_escrita += 20; desde_tela += 20; desde_temp += 20; desde_cursor += 20;
     }
 }
 
@@ -716,6 +793,8 @@ int main(int argc, char *argv[])
     sbv_patch_disable_prefix_check();
     SifLoadModule("rom0:SIO2MAN", 0, NULL);
     SifLoadModule("rom0:PADMAN", 0, NULL);
+    /* memory cards para o explorador do celular (op 0/3/5–7 em mc0:/mc1:); pelo PS2Link já estão carregados */
+    if (SifLoadModule("rom0:MCMAN", 0, NULL) >= 0) SifLoadModule("rom0:MCSERV", 0, NULL);
     {   /* Bluetooth: usbd + ds34bt com 1 controle (como o OPL faz) */
         int pads = 1;
         SifExecModuleBuffer(USBD_irx, size_USBD_irx, 0, NULL, NULL);
@@ -806,6 +885,7 @@ int main(int argc, char *argv[])
         antes = botoes;
         if ((botoes & (PAD_SELECT | PAD_START)) == (PAD_SELECT | PAD_START)) break;
 
+        if (rem_novo) { cx = rem_x; cy = rem_y; rem_novo = 0; }   /* o celular moveu o cursor */
         cx += lx * (lx < 0 ? -lx : lx) / 1600.0f;
         cy += ly * (ly < 0 ? -ly : ly) / 1600.0f;
         if (botoes & PAD_LEFT) cx -= 4;

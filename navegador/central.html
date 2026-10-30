@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Central PS2 Henbox</title>
+<!-- Central do celular (24/10/2026): servida pelo central.py da TV box (porta 8785). No app PS2 Henbox, window.Henbox
+     liga o servidor de ISOs do celular e devolve o endereço; num navegador comum, tudo menos a aba do celular. -->
+<style>
+:root{--fundo:#0b1630;--cartao:#132a57;--borda:#24407a;--texto:#fff;--fraco:#9fb4e0;--azul:#3466c8;--verde:#3fb950;
+--amarelo:#ffd166;--vermelho:#f85149}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fundo);color:var(--texto);font:16px system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+header{position:sticky;top:0;background:#0e1d40;z-index:5;border-bottom:1px solid var(--borda)}
+header h1{margin:0;padding:10px 16px 4px;font-size:19px}
+#status{padding:0 16px 8px;color:var(--fraco);font-size:13px}
+nav{display:flex;overflow-x:auto}
+nav button{flex:1;min-width:76px;background:none;border:0;color:var(--fraco);padding:10px 4px;font-size:14px;border-bottom:3px solid transparent}
+nav button.ativo{color:#fff;border-color:var(--amarelo)}
+main{padding:12px 16px 120px}
+section{display:none}section.ativo{display:block}
+h2{font-size:17px;margin:16px 0 8px}
+.b{background:var(--azul);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-size:15px;margin:3px 4px 3px 0}
+.b.s{background:#24407a;padding:7px 10px;font-size:13px}.b.v{background:#2d7a3e}.b.r{background:#8a2a26}
+.b:disabled{opacity:.45}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.jogo{background:var(--cartao);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.jogo img,.jogo .semcapa{width:100%;aspect-ratio:140/200;object-fit:cover;background:#1d3b78;display:flex;align-items:center;
+justify-content:center;color:var(--fraco);font-size:12px;text-align:center}
+.jogo .i{padding:8px;font-size:13px;flex:1;display:flex;flex-direction:column;gap:4px}
+.jogo .t{font-weight:600;font-size:14px;word-break:break-word}.jogo .c{color:var(--fraco);font-size:12px}
+.cartao{background:var(--cartao);border-radius:12px;padding:12px;margin:0 0 10px}
+.cartao .t{font-weight:600;font-size:16px}.p{color:var(--fraco);font-size:13px}
+.lista .it{display:flex;align-items:center;gap:8px;padding:10px 6px;border-bottom:1px solid #1d3b78}
+.lista .it .n{flex:1;word-break:break-all}.lista .it .z{color:var(--fraco);font-size:12px;white-space:nowrap}
+.lista .it.pasta .n{color:var(--amarelo)}
+select,input,textarea{width:100%;background:#0e1d40;color:#fff;border:1px solid var(--borda);border-radius:8px;padding:9px;font-size:15px;margin:3px 0 8px}
+label{font-size:13px;color:var(--fraco)}
+#pad{height:46vh;min-height:240px;background:#0e1d40;border:2px dashed var(--borda);border-radius:16px;touch-action:none;
+display:flex;align-items:center;justify-content:center;color:var(--fraco);text-align:center;user-select:none}
+.botoes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.botoes .b{margin:0;padding:12px 4px}
+#tarefas{position:fixed;left:0;right:0;bottom:0;background:#0e1d40;border-top:1px solid var(--borda);max-height:30vh;overflow:auto;z-index:6}
+#tarefas .tf{padding:8px 16px;font-size:13px;border-bottom:1px solid #1d3b78}
+.barra{height:5px;background:#24407a;border-radius:3px;margin-top:4px}.barra i{display:block;height:100%;background:var(--azul);border-radius:3px}
+.tf.pronto .barra i{background:var(--verde)}.tf.erro{color:var(--vermelho)}
+.aviso{background:#3b2f0d;border-left:4px solid var(--amarelo);padding:9px 12px;border-radius:8px;font-size:14px;margin:8px 0}
+.ok{color:var(--verde)}.nao{color:var(--vermelho)}
+#msg{position:fixed;left:16px;right:16px;bottom:16px;background:#1d3b78;padding:12px;border-radius:10px;display:none;z-index:9}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎮 Central PS2 Henbox</h1>
+  <div id="status">conectando na TV box…</div>
+  <nav>
+    <button data-aba="jogos" class="ativo">🎮 Jogos</button>
+    <button data-aba="online">🌐 Online</button>
+    <button data-aba="arquivos">📁 Arquivos</button>
+    <button data-aba="controle">🖱 Controle</button>
+  </nav>
+</header>
+<main>
+<section id="jogos" class="ativo">
+  <div class="cartao">🏆 <b>Sua conta do RetroAchievements</b> — para conquistar na tua conta: no app PS2 Henbox toque <b>Instalar conquistas na TV box</b>; o xeRAbora abre e você digita teu usuário e senha (uma vez só, deixa "OPEN TO THE NETWORK" ligado). O painel 🏆 e as medalhas passam a ser SEMPRE da conta que estiver logada no xeRAbora da box — cada box instalada tem a login dela, independente.</div>
+  <h2>💾 Pendrive da TV box</h2>
+  <button class="b" onclick="baixarCapas()">🖼 Baixar capas que faltam</button>
+  <div class="p">Capas no padrão do OPL (ART/&lt;código&gt;_COV.jpg, 140×200), do acervo xlenore/ps2-covers.</div>
+  <div id="jogosBox" class="grade" style="margin-top:10px"></div>
+  <h2>📱 Neste celular</h2>
+  <div id="celInfo" class="p"></div>
+  <button class="b s" id="btProcurar" onclick="procurarCelular()">🔎 Procurar ISOs no celular</button>
+  <div id="jogosCel" class="grade" style="margin-top:10px"></div>
+</section>
+
+<section id="online">
+  <h2>🌐 Games Online (do catálogo da loja)</h2>
+  <div id="onlineLivre" class="p"></div>
+  <div id="onlineListaNg" class="grade" style="margin-top:8px"></div>
+  <div class="p" style="margin-top:10px">Clicou em <b>📤 enviar</b> → o ISO entra na fila da loja e sai no pendrive da box já com o DNS do servidor online. E também aparece na aba 🌐 da loja (TV).</div>
+  <h2>📤 Kits para usar online (VMC, patch e DNS)</h2>
+  <div class="aviso">Aqui só circulam <b>kits</b> (VMC, CFG, patch e DNS). O jogo é o ISO do <b>seu</b> disco — no pendrive da box ou no celular.</div></div>
+  <div id="dnsKit"></div>
+  <div id="kits"></div>
+  <h2>📤 Enviar um kit para a comunidade</h2>
+  <div class="cartao">
+    <label>Código do jogo (ex.: SLUS_203.12)</label><input id="kCodigo">
+    <label>Nome do jogo</label><input id="kTitulo">
+    <label>DNS do servidor online (opcional)</label><input id="kDns" placeholder="ex.: 45.7.228.197" inputmode="decimal">
+    <label>Servidor / comunidade</label><input id="kServidor">
+    <label>Seu nome ou apelido</label><input id="kAutor">
+    <label>Como jogar (o que configurar, horários…)</label><textarea id="kNotas" rows="3"></textarea>
+    <label>Versão testada: ISO do pendrive da box (para o hash)</label><select id="kVersao"><option value="">— nenhuma —</option></select>
+    <label>Arquivos: VMC (.bin), CFG (.cfg), patch (.ppf), capa (.jpg/.png)</label><input id="kArquivos" type="file" multiple>
+    <button class="b v" onclick="enviarKit()">📤 Enviar para aprovação</button>
+  </div>
+</section>
+
+<section id="arquivos">
+  <label>Onde</label>
+  <select id="fonte" onchange="abrir(raizDe(this.value))">
+    <option value="box">💾 Pendrive da TV box</option>
+    <option value="mc0:/">🟦 Memory card 1 (mc0:)</option>
+    <option value="mc1:/">🟦 Memory card 2 (mc1:)</option>
+    <option value="mass:/">🔌 Pendrive no PS2 (mass:)</option>
+  </select>
+  <div class="p" id="fonteInfo"></div>
+  <div style="margin:8px 0"><b id="caminho">/</b></div>
+  <button class="b s" onclick="subir()">⬆ Voltar pasta</button>
+  <button class="b s" onclick="novaPasta()">➕ Nova pasta</button>
+  <button class="b s" onclick="document.getElementById('envio').click()">📤 Enviar arquivo aqui</button>
+  <button class="b s" onclick="abrir(atual)">🔄</button>
+  <input id="envio" type="file" style="display:none" onchange="enviarArquivo(this)">
+  <div id="lista" class="lista"></div>
+</section>
+
+<section id="controle">
+  <div id="pad">Arraste para mover o cursor da TV<br>toque = clique · dois dedos = rolar</div>
+  <div class="botoes">
+    <button class="b" onclick="botao('CIRCULO')">⭕ Voltar</button>
+    <button class="b" onclick="botao('TRIANGULO')">🔺 Recarregar</button>
+    <button class="b" onclick="botao('QUADRADO')">⬛ Teclado</button>
+    <button class="b" onclick="botao('START')">🏠 Início</button>
+    <button class="b" onclick="botao('R2')">🛒 Loja</button>
+    <button class="b" onclick="ev({tipo:'rolar',dy:-300})">⏫</button>
+    <button class="b" onclick="ev({tipo:'rolar',dy:300})">⏬</button>
+    <button class="b" onclick="ev({tipo:'clique'})">👆 Clique</button>
+  </div>
+  <h2>⌨ Digitar na TV</h2>
+  <input id="texto" placeholder="escreva e toque em Enviar" autocomplete="off">
+  <button class="b" onclick="digitar()">Enviar</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'enter'})">↵ Enter</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'apagar'})">⌫</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'tab'})">Tab</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'cima'})">↑</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'baixo'})">↓</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'esquerda'})">←</button>
+  <button class="b s" onclick="ev({tipo:'tecla',nome:'direita'})">→</button>
+  <div class="p" style="margin-top:10px">Funciona com o navegador aberto no PS2 (Loja, sistema, vídeos e qualquer página).</div>
+</section>
+</main>
+<div id="tarefas"></div>
+<div id="msg"></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mb = n => n >= 1<<30 ? (n / (1<<30)).toFixed(1) + ' GB' : n >= 1<<20 ? Math.round(n / (1<<20)) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+let estado = {}, atual = '', jogos = {box: [], celular: []};
+
+function aviso(t, seg = 4) { const m = $('#msg'); m.textContent = t; m.style.display = 'block'; clearTimeout(aviso.t); aviso.t = setTimeout(() => m.style.display = 'none', seg * 1000); }
+async function api(caminho, corpo, metodo) {
+  const op = corpo === undefined ? {} : {method: metodo || 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo)};
+  const r = await fetch(caminho, op);
+  const j = await r.json().catch(() => ({erro: 'resposta inválida da box'}));
+  if (!r.ok || j.erro) throw new Error(j.erro || ('HTTP ' + r.status));
+  return j;
+}
+async function tentar(f) { try { return await f(); } catch (e) { aviso('⚠ ' + e.message, 7); } }
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button, section').forEach(x => x.classList.remove('ativo'));
+  b.classList.add('ativo'); $('#' + b.dataset.aba).classList.add('ativo');
+  if (b.dataset.aba === 'online') { carregarKits(); carregarOnline(); }
+  if (b.dataset.aba === 'arquivos' && !atual) abrir(raizDe($('#fonte').value));
+});
+
+async function carregarEstado() {
+  try {
+    estado = await api('/api/estado');
+    $('#status').innerHTML = (estado.pendrive ? `💾 pendrive da box: ${mb(estado.livre)} livres` : '⚠ sem pendrive na box') +
+      ' · ' + (estado.ps2_aberto ? '<span class="ok">● PS2 com o navegador aberto</span>' : '<span class="p">○ navegador fechado no PS2</span>');
+  } catch (e) { $('#status').textContent = '⚠ TV box fora do alcance: ' + e.message; }
+}
+
+// ---------- jogos e capas ----------
+const J = [];   // referências para os botões (nomes com aspas não entram no onclick)
+const ref = o => J.push(o) - 1;
+function cartaoJogo(j) {
+  const n = ref(j);
+  const capa = j.codigo ? `<img loading="lazy" src="/api/capa/${encodeURIComponent(j.codigo)}.jpg" onerror="this.outerHTML='<div class=semcapa>sem capa</div>'">` : '<div class="semcapa">código não encontrado</div>';
+  let acoes = '';
+  if (j.onde === 'celular') {
+    acoes = `<button class="b s" onclick="celJogar(J[${n}].nome)">▶ Jogar daqui</button>
+      <button class="b s" onclick="celBox(J[${n}].nome)">→ pendrive da box</button>
+      <button class="b s" onclick="celPs2(J[${n}].nome)">→ pendrive do PS2</button>`;
+  } else if (j.codigo && !j.capa) acoes = `<button class="b s" onclick="baixarCapas([J[${n}].codigo])">🖼 capa</button>`;
+  return `<div class="jogo">${capa}<div class="i"><div class="t">${esc(j.titulo)}</div>
+    <div class="c">${esc(j.codigo || '?')} · ${j.pasta || 'DVD'} · ${mb(j.tam)}${j.onde === 'box' ? (j.capa ? ' · 🖼' : ' · sem capa no pendrive') : ''}</div>${acoes}</div></div>`;
+}
+async function carregarJogos() {
+  const j = await tentar(() => api('/api/jogos')); if (!j) return;
+  jogos = j;
+  $('#jogosBox').innerHTML = j.box.map(cartaoJogo).join('') || '<div class="p">Nenhum ISO em DVD/ ou CD/ do pendrive da box.</div>';
+  $('#jogosCel').innerHTML = j.celular.map(cartaoJogo).join('');
+  $('#kVersao').innerHTML = '<option value="">— nenhuma —</option>' + j.box.filter(x => x.codigo).map(x => `<option value="${esc(x.nome)}">${esc(x.titulo)} (${esc(x.codigo)})</option>`).join('');
+}
+async function baixarCapas(codigos) { await tentar(async () => { await api('/api/capas/baixar', {codigos}); aviso('Baixando capas…'); vigiar(); }); }
+
+// ---------- celular ----------
+async function procurarCelular() {
+  if (!window.Henbox) { $('#celInfo').textContent = 'Abra esta página pelo app PS2 Henbox no celular para ver os ISOs dele.'; return; }
+  $('#celInfo').textContent = '🔎 Procurando ISOs na memória do celular…';
+  setTimeout(async () => {
+    let s;
+    try { s = JSON.parse(Henbox.servidor()); } catch (e) { $('#celInfo').textContent = '⚠ ' + e; return; }
+    if (s.erro) { $('#celInfo').textContent = '⚠ ' + s.erro; return; }
+    const r = await tentar(() => api('/api/celular/registrar', {url: s.url, chave: s.chave}));
+    if (r) { $('#celInfo').textContent = `${r.isos.length} ISO(s) em ${r.aparelho}. O celular fica servindo enquanto o aviso "PS2 Henbox" estiver na barra.`; carregarJogos(); }
+  }, 50);
+}
+async function celJogar(nome) { await tentar(async () => { const r = await api('/api/celular/jogar', {nome}); aviso(r.ok ? '▶ Abrindo no PS2 pela rede (não deixe o celular sair do Wi-Fi)' : '⚠ ' + r.resposta, 7); }); }
+async function celBox(nome) { await tentar(async () => { await api('/api/celular/para-box', {nome}); aviso('Copiando para o pendrive da box…'); vigiar(); }); }
+async function celPs2(nome) { await tentar(async () => { const r = await api('/api/celular/para-ps2', {nome}); aviso(r.ok ? 'O PS2 está copiando (veja o aviso na TV)' : '⚠ ' + r.resposta, 7); }); }
+
+// ---------- kits ----------
+async function carregarKits() {
+  $('#kits').innerHTML = '<div class="p">carregando kits…</div>';
+  const dk = estado.dns_kit || {};
+  $('#dnsKit').innerHTML = dk.ip && dk.ate * 1000 > Date.now() ? `<div class="cartao">🌐 DNS do kit <b>${esc(dk.ip)}</b> ligado no PS2 (cabo da box) até ${new Date(dk.ate * 1000).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} <button class="b s r" onclick="desligarDns()">desligar</button></div>` : '';
+  const r = await tentar(() => api('/api/kits'));
+  if (!r) { $('#kits').innerHTML = ''; return; }
+  $('#kits').innerHTML = r.kits.map(k => {
+    const meus = k.meus.map(m => {
+      const n = ref({kit: k.id, nome: m.nome});
+      const comp = m.compativel === true ? '<span class="ok">✅ versão igual à testada</span>' : m.compativel === false ? '<span class="nao">❌ versão diferente</span>' : '';
+      return `<div style="margin-top:6px">${m.onde === 'box' ? '💾' : '📱'} ${esc(m.nome)} ${comp}<br>
+        ${m.onde === 'box' ? `<button class="b v" onclick="aplicar(J[${n}].kit,'box',J[${n}].nome,${m.compativel === false})">⚡ Jogar online (aplicar kit)</button>
+        ${k.arquivos.some(a => a.tipo === 'ppf') ? `<button class="b s" onclick="desfazer(J[${n}].kit,J[${n}].nome)">↩ desfazer patch</button>` : ''}`
+        : `<button class="b s" onclick="celBox(J[${n}].nome)">→ copiar para a box primeiro</button>`}</div>`;
+    }).join('') || '<div class="p" style="margin-top:6px">Você ainda não tem esse jogo no pendrive da box nem no celular.</div>';
+    return `<div class="cartao"><div class="t">${esc(k.titulo || k.codigo)}</div>
+      <div class="p">${esc(k.codigo)}${k.servidor ? ' · 🖥 ' + esc(k.servidor) : ''}${k.dns ? ' · DNS ' + esc(k.dns) : ''}${k.testado ? ' · ✅ testado online em ' + esc(k.testado) : ''}${k.autor ? ' · por ' + esc(k.autor) : ''}</div>
+      <div class="p">📦 ${k.arquivos.map(a => esc(a.tipo.toUpperCase())).join(' + ') || 'só DNS'}</div>
+      ${k.notas ? `<div style="margin-top:6px;font-size:14px;white-space:pre-wrap">${esc(k.notas)}</div>` : ''}${meus}</div>`;
+  }).join('') || '<div class="p">Nenhum kit publicado ainda. Seja o primeiro a enviar!</div>';
+}
+async function aplicar(kit, onde, nome, forcar) {
+  if (forcar && !confirm('A versão do seu ISO é diferente da testada. Aplicar mesmo assim?')) return;
+  await tentar(async () => { await api('/api/kits/aplicar', {kit, onde, nome, forcar}); aviso('Aplicando o kit no pendrive…'); vigiar(); });
+}
+async function desfazer(kit, nome) { if (confirm('Voltar o ISO como era antes do patch?')) await tentar(async () => { await api('/api/kits/desfazer', {kit, nome}); aviso('✔ ISO voltou ao original'); }); }
+async function desligarDns() { await tentar(async () => { await api('/api/kits/desligar-dns', {}); await carregarEstado(); carregarKits(); }); }
+
+// ---------- games online (catálogo do notebook, via /api/online da central) ----------
+let vigiandoOnline = null;
+function cartaoOnline(j, nuvem) {
+  const n = ref(j);
+  const capa = j.capa ? `<img loading="lazy" src="/api/capa/${encodeURIComponent(j.serial || j.id)}.jpg" onerror="this.outerHTML='<div class=semcapa>sem capa</div>'">` : '<div class="semcapa">sem capa</div>';
+  let acao = nuvem ? '🌐 roda pela nuvem, direto do servidor — é só entrar no jogo'
+    : j.instalado ? '<span class="ok">✅ já está no pendrive</span>'
+    : j.existe ? `<button class="b v" onclick="instalarOnline(J[${n}].id)">📤 enviar ISO para o pendrive</button>`
+    : '<span class="nao">— o notebook já não tem esse ISO</span>';
+  return `<div class="jogo">${capa}<div class="i"><div class="t">${esc(j.nome)}</div>
+    <div class="c">${esc(j.serial || j.id)} · ${mb(j.tamanho || 0)}${j.dns ? ' · DNS ' + esc(j.dns) : ''} · 📡 ${j.vmc ? 'com VMC' : 'DNS embutido'}</div>
+    <div style="margin-top:6px">${acao}</div></div></div>`;
+}
+async function carregarOnline() {
+  clearTimeout(vigiandoOnline);
+  const c = await tentar(() => api('/api/online')); if (!c) return;
+  let fila = [];
+  if (!c.nuvem) {
+    const f = await tentar(() => api('/api/online/fila'));
+    fila = (f && f.fila) || [];
+    $('#onlineLivre').innerHTML = f && f.total ? `💾 pendrive da box: ${mb(f.livre)} livres` +
+      (fila.length ? ` · ⏳ ${fila.length > 1 ? fila.length + ' na fila' : esc(fila[0]) + ' (copiando…)'}` : ' · fila vazia') : `<span class="nao">⚠ notebook fora do ar: ${esc((f && f.erro) || 'a loja (8770) não responde')}</span>`;
+  } else {
+    $('#onlineLivre').innerHTML = '🌐 <b>modo nuvem</b>: os ISOs ficam no servidor de rodrigoflix e o PS2 puxa pela internet com a sua chave — o jogo aparece na TV em segundos, sem instalar nada.';
+  }
+  $('#onlineListaNg').innerHTML = (c.online || []).map(j => cartaoOnline(j, c.nuvem)).join('') || '<div class="p">Nenhum jogo online no catálogo (a varredura dos grupos roda no notebook).</div>';
+  if (fila.length) vigiandoOnline = setTimeout(carregarOnline, 3000);
+}
+async function instalarOnline(id) { await tentar(async () => { const r = await api('/api/online/instalar', {id}); aviso(r.ok ? '📥 na fila da loja: o ISO vai para o pendrive da box' : '⚠ ' + r.msg, 8); carregarOnline(); }); }
+
+async function enviarKit() {
+  const arquivos = [];
+  for (const f of $('#kArquivos').files) {
+    if (f.size > 70 << 20) { aviso('⚠ ' + f.name + ' é grande demais'); return; }
+    const b = new Uint8Array(await f.arrayBuffer()); let s = '';
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    arquivos.push({nome: f.name, dados: btoa(s)});
+  }
+  const versoes = [];
+  const iso = $('#kVersao').value;
+  const doIso = jogos.box.find(x => x.nome === iso);
+  if (doIso && !$('#kCodigo').value.trim()) $('#kCodigo').value = doIso.codigo;
+  const dados = {codigo: $('#kCodigo').value.trim(), titulo: $('#kTitulo').value.trim(), dns: $('#kDns').value.trim(),
+    servidor: $('#kServidor').value.trim(), autor: $('#kAutor').value.trim(), notas: $('#kNotas').value.trim(), arquivos, versoes, iso};
+  await tentar(async () => { const r = await api('/api/kits/enviar', dados); aviso('✔ ' + r.msg, 7); });
+}
+
+// ---------- arquivos ----------
+const ehBox = () => $('#fonte').value === 'box';
+const raizDe = v => v === 'box' ? '' : v;
+function juntar(a, b) { return ehBox() ? (a ? a + '/' + b : b) : (a.endsWith('/') ? a + b : a + '/' + b); }
+async function abrir(c) {
+  atual = c; $('#caminho').textContent = ehBox() ? '/' + c : c;
+  $('#fonteInfo').textContent = ehBox() ? '' : 'Pelo PS2: abra o navegador (OPL → Apps → PS2 Henbox). Pastas do sistema, do exploit e do OPL ficam protegidas.';
+  $('#lista').innerHTML = '<div class="p">carregando…</div>';
+  const r = await tentar(() => api((ehBox() ? '/api/box/listar?c=' : '/api/ps2/listar?c=') + encodeURIComponent(c)));
+  if (!r) { $('#lista').innerHTML = ''; return; }
+  $('#lista').innerHTML = r.itens.map((i, k) => `<div class="it ${i.pasta ? 'pasta' : ''}">
+    <span class="n" onclick="${i.pasta ? `abrir(juntar(atual, itens[${k}].nome))` : ''}">${i.pasta ? '📁' : '📄'} ${esc(i.nome)}</span>
+    <span class="z">${i.pasta ? '' : mb(i.tam)}</span>
+    ${i.pasta ? '' : `<button class="b s" onclick="baixar(${k})">⬇</button>`}
+    ${ehBox() ? `<button class="b s" onclick="renomear(${k})">✏</button>` : ''}
+    ${i.protegido ? '🔒' : `<button class="b s r" onclick="apagar(${k})">🗑</button>`}</div>`).join('') || '<div class="p">pasta vazia</div>';
+  window.itens = r.itens;
+}
+function subir() {
+  if (ehBox()) abrir(atual.split('/').slice(0, -1).join('/'));
+  else { const p = atual.replace(/\/$/, ''); const i = p.lastIndexOf('/'); abrir(i > p.indexOf(':') + 1 ? p.slice(0, i) : p.slice(0, p.indexOf(':') + 2)); }
+}
+function baixar(k) {
+  const c = juntar(atual, itens[k].nome);
+  const url = (ehBox() ? '/api/box/baixar?c=' : '/api/ps2/baixar?c=') + encodeURIComponent(c);
+  if (window.Henbox && Henbox.baixar) { Henbox.baixar(location.origin + url, itens[k].nome); aviso('⬇ Baixando para a pasta Download do celular'); }
+  else location.href = url;
+  if (!ehBox()) aviso('O PS2 está lendo o arquivo… o download começa quando ele terminar.', 6);
+}
+async function apagar(k) {
+  const i = itens[k];
+  if (!confirm(`Apagar ${i.pasta ? 'a pasta' : ''} "${i.nome}"?` + (i.pasta && !ehBox() ? ' (só pasta vazia no PS2)' : ''))) return;
+  const c = juntar(atual, i.nome);
+  await tentar(async () => { await api(ehBox() ? '/api/box/apagar' : '/api/ps2/apagar', {c, pasta: i.pasta}); abrir(atual); });
+}
+async function renomear(k) {
+  const novo = prompt('Novo nome:', itens[k].nome); if (!novo) return;
+  await tentar(async () => { await api('/api/box/renomear', {c: juntar(atual, itens[k].nome), novo}); abrir(atual); });
+}
+async function novaPasta() {
+  const n = prompt('Nome da pasta:'); if (!n) return;
+  await tentar(async () => { await api(ehBox() ? '/api/box/pasta' : '/api/ps2/pasta', {c: juntar(atual, n)}); abrir(atual); });
+}
+async function enviarArquivo(inp) {
+  const f = inp.files[0]; inp.value = ''; if (!f) return;
+  const c = juntar(atual, f.name);
+  if ((window.itens || []).some(i => i.nome === f.name) && !confirm(`"${f.name}" já existe aqui. Substituir?`)) return;
+  aviso(`Enviando ${f.name} (${mb(f.size)})…`, 60);
+  await tentar(async () => {
+    const r = await fetch((ehBox() ? '/api/box/enviar?c=' : '/api/ps2/enviar?c=') + encodeURIComponent(c), {method: 'POST', body: f});
+    const j = await r.json(); if (j.erro) throw new Error(j.erro);
+    aviso(ehBox() ? '✔ Enviado' : 'Na box; o PS2 está gravando…'); if (!ehBox()) vigiar(); abrir(atual);
+  });
+}
+
+// ---------- controle ----------
+let fila = [], enviando = false;
+function ev(e) { fila.push(e); despachar(); }
+async function despachar() {
+  if (enviando || !fila.length) return;
+  enviando = true;
+  // junta os movimentos seguidos num só (o Wi-Fi não aguenta um pedido por toque)
+  const lote = [];
+  for (const e of fila.splice(0)) {
+    const ult = lote[lote.length - 1];
+    if (e.tipo === 'mover' && ult && ult.tipo === 'mover') { ult.dx += e.dx; ult.dy += e.dy; } else lote.push({...e});
+  }
+  try { const r = await api('/api/controle', lote); if (!r.ok) aviso('⚠ ' + r.resposta); } catch (e) { aviso('⚠ ' + e.message); }
+  enviando = false;
+  if (fila.length) setTimeout(despachar, 30);
+}
+function botao(nome) { ev({tipo: 'botao', nome}); }
+function digitar() { const t = $('#texto').value; if (t) ev({tipo: 'texto', texto: t}); $('#texto').value = ''; }
+$('#texto').addEventListener('keydown', e => { if (e.key === 'Enter') { digitar(); ev({tipo: 'tecla', nome: 'enter'}); } });
+(() => {
+  const pad = $('#pad'); let ult = null, moveu = 0, inicio = 0, dedos = 0;
+  const VEL = 1.6;
+  pad.addEventListener('touchstart', e => { e.preventDefault(); dedos = e.touches.length; const t = e.touches[0]; ult = {x: t.clientX, y: t.clientY}; moveu = 0; inicio = Date.now(); }, {passive: false});
+  pad.addEventListener('touchmove', e => {
+    e.preventDefault(); const t = e.touches[0]; if (!ult) return;
+    const dx = t.clientX - ult.x, dy = t.clientY - ult.y; ult = {x: t.clientX, y: t.clientY}; moveu += Math.abs(dx) + Math.abs(dy);
+    if (e.touches.length >= 2 || dedos >= 2) ev({tipo: 'rolar', dy: dy * -4});
+    else ev({tipo: 'mover', dx: dx * VEL, dy: dy * VEL});
+  }, {passive: false});
+  pad.addEventListener('touchend', e => { e.preventDefault(); if (moveu < 8 && Date.now() - inicio < 300 && dedos === 1) ev({tipo: 'clique'}); if (!e.touches.length) dedos = 0; }, {passive: false});
+  // no computador: mouse
+  let apertado = false;
+  pad.addEventListener('mousedown', e => { apertado = true; ult = {x: e.clientX, y: e.clientY}; moveu = 0; });
+  pad.addEventListener('mousemove', e => { if (!apertado) return; const dx = e.clientX - ult.x, dy = e.clientY - ult.y; ult = {x: e.clientX, y: e.clientY}; moveu += Math.abs(dx) + Math.abs(dy); ev({tipo: 'mover', dx: dx * VEL, dy: dy * VEL}); });
+  pad.addEventListener('mouseup', () => { apertado = false; if (moveu < 4) ev({tipo: 'clique'}); });
+})();
+
+// ---------- tarefas ----------
+let vigiando = null;
+async function vigiar() {
+  clearTimeout(vigiando);
+  const ts = await api('/api/tarefas').catch(() => []);
+  const recentes = ts.filter(t => t.estado === 'rodando' || (t.fim && Date.now() / 1000 - t.fim < 90));
+  $('#tarefas').innerHTML = recentes.map(t => `<div class="tf ${t.estado}"><b>${esc(t.titulo)}</b> — ${t.estado === 'rodando' ? t.pct + '%' : t.estado === 'pronto' ? '✔ pronto' : '✖ erro'}
+    <div>${esc(t.msg)}</div>${t.estado === 'rodando' ? `<div class="barra"><i style="width:${t.pct}%"></i></div>` : ''}</div>`).join('');
+  if (ts.some(t => t.estado === 'rodando')) vigiando = setTimeout(vigiar, 1500);
+  else { carregarJogos(); carregarEstado(); vigiando = setTimeout(() => $('#tarefas').innerHTML = '', 60000); }
+}
+
+carregarEstado(); carregarJogos(); vigiar();
+setInterval(carregarEstado, 15000);
+if (window.Henbox) procurarCelular(); else $('#celInfo').textContent = 'Abra pelo app PS2 Henbox no celular para ver e jogar os ISOs dele.';
+</script>
+</body>
+</html>

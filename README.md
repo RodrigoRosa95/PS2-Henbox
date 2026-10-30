@@ -49,6 +49,17 @@ por segundo, 56 conquistas acompanhadas). No celular, o app [PS2 Conquistas](app
 ([APK](downloads/PS2Conquistas.apk)) acha a TV box sozinho e avisa cada desbloqueio com a medalha e um plim de troféu.
 Detalhes em [Conquistas](docs/conquistas.md).
 
+## 🆕 Novidades (24/10/2026)
+
+- 📱 **Central do celular** no app PS2 Henbox: capas como o OPL Manager, explorador do MC/MASS e do pendrive da box, controle remoto (mouse e teclado) e ISOs da memória do celular (jogar direto ou mandar para a box)
+- 🌐 **Kits para jogar online**: VMC, CFG, PPF e DNS prontos da comunidade (nunca o ISO)
+- 🏆 **Conquistas acumuladas** aparecem quando o navegador abre, com voz: *"Você desbloqueou 7 conquistas no jogo Black."*
+- 🎵 **Suas músicas na Loja**: pasta `MUSICAS` no pendrive da box e barra ◀ ▶ (o pacote não traz música)
+- 💾 **Jogos do pendrive do PS2 lidos ao abrir** (pastas DVD e CD), com 🔄 para ler de novo
+- 🔄 **Reiniciar sistema**: volta ao PS2Link e reabre o navegador
+
+Detalhes em [docs/central-celular.md](docs/central-celular.md). Algumas partes ainda não foram testadas no PS2 ou num celular de verdade (marcadas lá).
+
 ## Telas (como aparecem no PS2, 640x448)
 
 | Menu | Loja |
@@ -89,6 +100,7 @@ Teste com os seus próprios jogos; a [loja de demonstração](#como-as-peças-se
 - [Instalação](docs/instalacao.md) — requisitos e o que vai no memory card, no pendrive do PS2, na TV box e no servidor
 - [Fluxo técnico do sistema](docs/fluxo-tecnico.md) — peças, portas, protocolos, fluxos e problemas resolvidos
 - [Conquistas RetroAchievements](docs/conquistas.md) — preparação automática, OPL-RA do Henbox e página de conquistas
+- [Central do celular, conquistas acumuladas e música](docs/central-celular.md) — novidades de 24/10/2026
 - [Guia para novo usuário](docs/guia-novo-usuario.md) — uso, controles, problemas comuns e roteiro de apresentação
 
 ## Estrutura
@@ -98,6 +110,8 @@ Teste com os seus próprios jogos; a [loja de demonstração](#como-as-peças-se
 | `navegador/ps2/` | `navegador.elf` (ps2sdk + gsKit): tela, controle, vídeo MPEG-2 no IPU, cópias para o pendrive, abertura do Neutrino |
 | `navegador/navlink/` | `navlink.irx`: o servidor de arquivos `host:` do PS2Link na porta TCP 0x4721 (código do ps2link, ver `LICENSE-PS2Link`) |
 | `navegador/*.py` | servidores da TV box (`navegador_servidor`, `servidor_host`, `videos`, `udpfs_nuvem`, `configurar`) e do notebook (`videos_https`) |
+| `navegador/central.py` | central do celular na TV box (porta 8785): capas, arquivos, controle, ISOs do celular, kits; página `central.html` |
+| `navegador/kits_servidor.py` | servidor dos kits online da comunidade (porta 8792): VMC/CFG/PPF/DNS com aprovação |
 | `navegador/tvbox/` | scripts de inicialização na TV box (Termux / Termux:Boot) |
 | `navegador/tvbox-app/` | app Android da TV box: WebView numa tela virtual 640x448 + ponte DevTools |
 | `navegador/instalador/` | app **PS2 Henbox** (celular ou TV box): instala tudo por ADB, Python pronto sem internet na box, estado ✅/❌, pendrive do PS2 pela USB da box, conquistas e pareamento por QR |

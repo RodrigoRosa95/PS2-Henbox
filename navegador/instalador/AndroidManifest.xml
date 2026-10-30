@@ -2,7 +2,7 @@
 <!-- PS2 Henbox (23/10/2026): o instalador virou o app único — instalar, estado, pendrive do PS2 e conquistas.
      O pacote continua br.ps2nav.instalador para atualizar por cima do "Instalador PS2". -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="br.ps2nav.instalador" android:versionCode="3" android:versionName="2.0">
+    package="br.ps2nav.instalador" android:versionCode="5" android:versionName="2.2">
     <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="23" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -10,6 +10,11 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Central (24/10/2026): ISOs da memória do celular para o PS2, Wi-Fi acordado enquanto serve -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- também roda na própria TV box (18/10/2026): aparece no launcher da TV e não exige tela de toque -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -33,6 +38,10 @@
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:configChanges="orientation|screenSize|keyboardHidden" />
         <service android:name=".VigiaConquistas" android:exported="false" />
+        <activity android:name=".Central" android:label="Central PS2 Henbox"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden" android:windowSoftInputMode="adjustResize" />
+        <service android:name=".ServidorIsos" android:exported="false" />
         <receiver android:name=".AoLigarConquistas" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

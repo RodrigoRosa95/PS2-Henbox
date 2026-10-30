@@ -47,14 +47,23 @@ PORTA_CDP = 9333
 PASTA_PS2 = os.path.join(PASTA, 'ps2')   # servida ao PS2 pelo ps2client (host:)
 MUSICA = 0x100                            # bit do cmd: tocar ps2/musica.raw (sons/gerar_sons.py)
 PEDIDO = 0x200                            # bit do cmd: há cópia em ps2/pedido.bin (ROM → pendrive do PS2)
+REMOTO = 0x400                            # bit do cmd: o celular controla o cursor (PS2 lê ps2/cursor.bin), central.py
+REMOTO_SEG = 120                          # o bit fica ligado até 2 min depois do último movimento do celular
+# teclas do controle remoto do celular (central.py): nome → (key, code, windowsVirtualKeyCode, texto)
+TECLAS_REMOTO = {'enter': ('Enter', 'Enter', 13, '\r'), 'apagar': ('Backspace', 'Backspace', 8, None),
+                 'tab': ('Tab', 'Tab', 9, None), 'esc': ('Escape', 'Escape', 27, None),
+                 'cima': ('ArrowUp', 'ArrowUp', 38, None), 'baixo': ('ArrowDown', 'ArrowDown', 40, None),
+                 'esquerda': ('ArrowLeft', 'ArrowLeft', 37, None), 'direita': ('ArrowRight', 'ArrowRight', 39, None)}
 ESTADOS_PEDIDO = {1: 'copiando', 2: 'pronto', 3: 'o PS2 não carregou o driver de pendrive',
-                  4: 'erro lendo a ROM do notebook', 5: 'pendrive não encontrado no PS2 (ou sem espaço)',
+                  4: 'erro lendo a origem', 5: 'pendrive não encontrado no PS2 (ou sem espaço)',
                   6: 'erro gravando no pendrive', 7: 'abrindo no PS2', 8: 'tocando', 9: 'vídeo acabou',
                   10: 'vídeo parado'}
 CINEMA = os.environ.get('PS2_NAV_CINEMA', f'http://{WEB}:8770/api/cinema/')   # vazio: sem Cinema (TV box)   # cinema.py (servidor ps2-web): pular / parado
 RA_ELF = 'SNESticle.elf'                              # SNESticle Revive com ROM por argv e DS4 (ps2/snesticle/ORIGEM.txt);
 #                                                         o RetroArch dava tela preta no PS2 real (17/10/2026)
 RA_PASTA = 'mass:/APPS/SNESTICLE'                       # no pendrive; title.cfg faz aparecer no OPL → Apps
+SMS_PASTA = 'mass:/APPS/SMS-CINEMA'   # SMS do cinema (23/10/2026): sempre liga o UDPFS → CINEMA-NUVEM da box (ps2/sms-cinema/)
+SMS_ARQS = ('SMS.ELF', 'SMS.lng', 'title.cfg')
 # teclas especiais do teclado USB (o PS2 manda 0x80|código): código → (key, code, windowsVirtualKeyCode)
 ESPECIAIS_USB = {0x29: ('ArrowRight', 'ArrowRight', 39), 0x2a: ('ArrowLeft', 'ArrowLeft', 37),
                  0x2b: ('ArrowDown', 'ArrowDown', 40), 0x2c: ('ArrowUp', 'ArrowUp', 38),
@@ -241,6 +250,8 @@ def desenhar_aviso(img, aviso):
     """Faixa no alto da tela (22/10/2026): memory card na nuvem e atualização do pendrive. Animação: três pontos que
     andam (girando) e, se houver, a barra de progresso; a box redesenha ~3 vezes por segundo enquanto houver aviso."""
     d = ImageDraw.Draw(img)
+    if aviso.get('sub') is not None:   # conquista (24/10/2026): medalha à esquerda, nome e descrição em 2 linhas
+        return desenhar_conquista(img, d, aviso)
     x0, y0, x1, y1 = 60, 14, LARG - 60, 70
     d.rounded_rectangle((x0 + 3, y0 + 4, x1 + 3, y1 + 4), 12, fill=(0, 0, 0))
     d.rounded_rectangle((x0, y0, x1, y1), 12, fill=(22, 27, 34), outline=aviso.get('cor', (47, 129, 247)), width=2)
@@ -261,6 +272,61 @@ def desenhar_aviso(img, aviso):
                                 fill=aviso.get('cor', (47, 129, 247)))
 
 
+def cortar(d, texto, fonte, largura):
+    """Texto que cabe na largura (com … no fim)."""
+    if d.textlength(texto, font=fonte) <= largura:
+        return texto
+    while texto and d.textlength(texto + '…', font=fonte) > largura:
+        texto = texto[:-1]
+    return texto + '…'
+
+
+def desenhar_conquista(img, d, aviso):
+    x0, y0, x1, y1 = 40, 14, LARG - 40, 100
+    cor = aviso.get('cor', (255, 209, 102))
+    d.rounded_rectangle((x0 + 3, y0 + 4, x1 + 3, y1 + 4), 14, fill=(0, 0, 0))
+    d.rounded_rectangle((x0, y0, x1, y1), 14, fill=(22, 27, 34), outline=cor, width=3)
+    tx = x0 + 18
+    ic = aviso.get('icone')
+    if ic is not None:
+        img.paste(ic, (x0 + 12, y0 + 11))
+        tx = x0 + 12 + ic.size[0] + 14
+    larg = x1 - tx - 16
+    d.text((tx, y0 + 12), cortar(d, aviso['texto'], FONTE_AVISO, larg), font=FONTE_AVISO, fill=cor)
+    d.text((tx, y0 + 38), cortar(d, aviso['sub'], FONTE_P, larg), font=FONTE_P, fill=(230, 237, 243))
+    if aviso.get('rodape'):
+        d.text((tx, y0 + 60), cortar(d, aviso['rodape'], FONTE_P, larg), font=FONTE_P, fill=(139, 148, 158))
+
+
+def medalha_img(badge):
+    """Medalha do RetroAchievements (ps2/ra/medalhas, baixada pelo videos.py) em 64x64, ou None."""
+    try:
+        arq = os.path.join(PASTA_PS2, 'ra', 'medalhas', f'{int(badge)}.png')
+        if os.path.exists(arq):
+            return Image.open(arq).convert('RGB').resize((64, 64))
+        # ainda não baixada: o videos.py (8780) baixa do RetroAchievements e guarda
+        with urllib.request.urlopen(f'http://127.0.0.1:8780/conquistas/medalha/{int(badge)}.png', timeout=8) as r:
+            return Image.open(BytesIO(r.read())).convert('RGB').resize((64, 64))
+    except (OSError, ValueError):
+        return None
+
+
+def frase_conquistas(novos):
+    """ "Você desbloqueou 7 conquistas no jogo Black." (vários jogos: "… 9 conquistas: 7 no Black e 2 no Burnout 3.")"""
+    por_jogo = {}
+    for c in novos:
+        por_jogo[c.get('jogo') or ''] = por_jogo.get(c.get('jogo') or '', 0) + 1
+    n = len(novos)
+    total = 'uma conquista' if n == 1 else f'{n} conquistas'
+    jogos = [j for j in por_jogo if j]
+    if len(jogos) == 1 and len(por_jogo) == 1:
+        return f'Você desbloqueou {total} no jogo {jogos[0]}.'
+    if len(jogos) > 1:
+        partes = [f'{k} no {j}' for j, k in por_jogo.items() if j]
+        return f'Você desbloqueou {total}: ' + ', '.join(partes[:-1]) + ' e ' + partes[-1] + '.'
+    return f'Você desbloqueou {total}.'
+
+
 # ---------------- sessão com o PS2 ----------------
 class Sessao:
     def __init__(self, nav):
@@ -274,6 +340,7 @@ class Sessao:
         self.fila = []
         self.resultados = {}
         self.ra_copiado = False
+        self.sms_copiado = False
         self.video_pid = None
         self.video_pos = 0
         self.botoes_video = 0
@@ -286,6 +353,13 @@ class Sessao:
         self.cx = self.cy = 0
         self.ult_mov = 0
         self.aviso = None           # faixa animada no alto (desenhar_aviso)
+        self.remoto_t = 0           # último comando do controle remoto do celular
+        self.remoto_n = 0
+        self.faixa_n = 0            # contador da faixa (bits 24-31 do cmd): mudou = o PS2 relê o musica.raw
+        try:
+            self.musica = json.load(open(os.path.join(PASTA_PS2, 'musica-estado.json'), encoding='utf-8'))
+        except (OSError, ValueError):
+            self.musica = {'ligada': True, 'id': None}
         nav.ao_quadro = self.novo_quadro
 
     # ---- tela ----
@@ -350,7 +424,9 @@ class Sessao:
                 for tipo in ('mousePressed', 'mouseReleased'):
                     n.cmd('Input.dispatchMouseEvent', type=tipo, x=px, y=py, button='left', clickCount=1)
                 threading.Timer(0.35, self.ver_campo).start()
-        if apertou & B['CIRCULO']:
+        if apertou & B['CIRCULO'] and getattr(self, 'mostrando_conquistas', False):
+            self.pular_conquistas = True   # ○ pula a fila de conquistas (não volta a página)
+        elif apertou & B['CIRCULO']:
             if self.teclado:
                 self.mostrar_teclado(False)
             else:
@@ -407,11 +483,142 @@ class Sessao:
 
     # ---- ligação com o PS2 (arquivos no host:) ----
     def cmd_atual(self):
-        cmd = 0   # música da loja desligada (pedido do usuário 17/10/2026: pesava o cursor); era MUSICA na loja.html
+        cmd = 0
+        # música de fundo só na loja (17/10 tinha sido desligada por pesar o cursor; 24/10 voltou com faixas e setas,
+        # o PS2 agora manda o som em blocos de 2048 amostras)
+        if self.musica.get('ligada') and '/loja' in self.nav.url and os.path.exists(os.path.join(PASTA_PS2, 'musica.raw')):
+            cmd |= MUSICA
+        cmd |= (self.faixa_n & 0xFF) << 24
         cmd |= (self.ler_aviso_seq() & 0xFF) << 16   # mudou = o navegador fala ps2/aviso.raw uma vez
         if self.pedido and self.pedido.get('estado') in (None, 'copiando'):
             cmd |= PEDIDO
+        if time.time() - self.remoto_t < REMOTO_SEG:
+            cmd |= REMOTO
         return cmd
+
+    # ---- música de fundo da loja (24/10/2026) ----
+    def faixas(self):
+        """Trilhas do pacote (ps2/trilhas, originais e livres) + as do usuário (MUSICAS/ do pendrive da box,
+        convertidas pela videos.py em ps2/trilhas-usuario). Cada uma: id, titulo, segundos, credito, arquivo."""
+        lista = []
+        for pasta in ('trilhas', 'trilhas-usuario'):
+            d = os.path.join(PASTA_PS2, pasta)
+            try:
+                itens = json.load(open(os.path.join(d, 'trilhas.json'), encoding='utf-8'))
+            except (OSError, ValueError):
+                continue
+            for t in itens:
+                arq = os.path.join(d, t['id'] + '.raw')
+                if os.path.exists(arq):
+                    lista.append(dict(t, arquivo=arq, usuario=pasta != 'trilhas'))
+        return lista
+
+    def musica_estado(self):
+        fs = self.faixas()
+        i = next((k for k, t in enumerate(fs) if t['id'] == self.musica.get('id')), -1)
+        atual = {k: v for k, v in fs[i].items() if k != 'arquivo'} if i >= 0 else None
+        return {'ligada': bool(self.musica.get('ligada')), 'faixa': atual, 'posicao': i + 1, 'total': len(fs),
+                'na_loja': '/loja' in self.nav.url, 'aberto': self.aberto()}
+
+    def musica_comando(self, acao):
+        """musica estado|proxima|anterior|ligar|desligar|faixa <id>"""
+        fs = self.faixas()
+        acao, _, arg = acao.partition(' ')
+        if acao in ('proxima', 'anterior', 'faixa', 'ligar') and fs:
+            i = next((k for k, t in enumerate(fs) if t['id'] == self.musica.get('id')), -1)
+            if acao == 'faixa':
+                i = next((k for k, t in enumerate(fs) if t['id'] == arg), i)
+            elif acao == 'proxima':
+                i = (i + 1) % len(fs)
+            elif acao == 'anterior':
+                i = (i - 1) % len(fs) if i >= 0 else len(fs) - 1
+            i = max(i, 0)
+            destino = os.path.join(PASTA_PS2, 'musica.raw')
+            if fs[i]['id'] != self.musica.get('id') or not os.path.exists(destino):
+                with open(fs[i]['arquivo'], 'rb') as f:
+                    dados = f.read(4 << 20)          # o PS2 aceita até 4 MB (~95 s)
+                gravar(destino, dados)
+                self.faixa_n = (self.faixa_n + 1) & 0xFF
+            self.musica.update(id=fs[i]['id'], ligada=True)
+        elif acao == 'desligar':
+            self.musica['ligada'] = False
+        if acao != 'estado':
+            gravar(os.path.join(PASTA_PS2, 'musica-estado.json'), json.dumps(self.musica).encode())
+            with self.trava:   # o PS2 vê a troca já, sem esperar a tela mudar
+                gravar(os.path.join(PASTA_PS2, 'dif.bin'), cabecalho(self.seq, self.seq, self.cmd_atual(), []))
+        return json.dumps(self.musica_estado(), ensure_ascii=False)
+
+    def musica_ciclo(self):
+        """Troca automática da faixa a cada 10 s (pedido do usuário 24/10/2026), só com a loja aberta e música ligada.
+        Cada tick confirma a URL direto com a página (Runtime.evaluate): o nav.url que vem do evento frameNavigated
+        fica no ar (e as trocas dependem de saber que a loja está na tela)."""
+        while True:
+            time.sleep(10)
+            try:
+                u = self.nav.js('location.href')
+                if u:
+                    self.nav.url = str(u)
+            except Exception as e:
+                log('música ciclo (url):', e)
+            if not self.musica.get('ligada') or '/loja' not in (self.nav.url or ''):
+                continue
+            try:
+                self.musica_comando('proxima')
+            except Exception as e:
+                log('música da loja (troca automática):', e)
+
+    # ---- controle remoto pelo celular (central.py, 24/10/2026) ----
+    def remoto(self, ev):
+        """Um evento do celular: mover/pos (cursor), clique, rolar, texto, tecla, botao (como o controle do PS2)."""
+        n, t = self.nav, ev.get('tipo')
+        ligar = time.time() - self.remoto_t >= REMOTO_SEG
+        self.remoto_t = time.time()
+        if ligar:   # o PS2 só lê o cursor.bin com o bit ligado: avisa já, sem esperar a tela mudar
+            with self.trava:
+                gravar(os.path.join(PASTA_PS2, 'dif.bin'), cabecalho(self.seq, self.seq, self.cmd_atual(), []))
+        if t in ('mover', 'pos'):
+            if t == 'mover':
+                x, y = self.cx + float(ev.get('dx', 0)), self.cy + float(ev.get('dy', 0))
+            else:
+                x, y = float(ev.get('x', 0)), float(ev.get('y', 0))
+            self.cx, self.cy = int(max(0, min(LARG - 1, x))), int(max(0, min(ALT - 1, y)))
+            self.remoto_n += 1
+            gravar(os.path.join(PASTA_PS2, 'cursor.bin'), b'PSC1' + struct.pack('<IHH', self.remoto_n, self.cx, self.cy))
+            if self.teclado:
+                self.sob = tecla_em(self.cx, self.cy)
+                self.enviar_tela()
+            n.cmd('Input.dispatchMouseEvent', esperar=False, type='mouseMoved',
+                  x=self.cx / n.zoom, y=self.cy / n.zoom)
+        elif t == 'clique':
+            self.botao('X')
+        elif t == 'rolar':
+            n.cmd('Input.dispatchMouseEvent', esperar=False, type='mouseWheel', x=self.cx / n.zoom, y=self.cy / n.zoom,
+                  deltaX=0, deltaY=float(ev.get('dy', 0)))
+        elif t == 'texto':
+            n.cmd('Input.insertText', text=str(ev.get('texto', ''))[:500])
+        elif t == 'tecla':
+            k = TECLAS_REMOTO.get(ev.get('nome'))
+            if not k:
+                return 'tecla desconhecida'
+            key, code, vk, texto = k
+            extra = {'text': texto} if texto else {}
+            n.cmd('Input.dispatchKeyEvent', type='keyDown' if texto else 'rawKeyDown', key=key, code=code,
+                  windowsVirtualKeyCode=vk, **extra)
+            n.cmd('Input.dispatchKeyEvent', type='keyUp', key=key, code=code, windowsVirtualKeyCode=vk)
+        elif t == 'botao':
+            if ev.get('nome') not in B:
+                return 'botão desconhecido'
+            self.botao(ev['nome'])
+        else:
+            return 'tipo desconhecido'
+        return 'ok'
+
+    def botao(self, nome):
+        """Aperta e solta um botão do controle (mesmo efeito do controle do PS2 na posição atual do cursor)."""
+        antes = self.botoes & ~B[nome]
+        self.botoes = antes
+        self.entrada(antes | B[nome], self.cx, self.cy, 0, 0)
+        self.entrada(antes, self.cx, self.cy, 0, 0)
 
     def copiar(self, arquivo):
         """ROM de ps2/snes → pendrive USB do PS2 (mass:/SNES/), junto com o RetroArch (1ª vez na sessão)."""
@@ -432,6 +639,20 @@ class Sessao:
             return 'o navegador não está aberto no PS2'
         self.enfileirar(0, f'host:snesticle/{RA_ELF}', f'{RA_PASTA}/{RA_ELF}', '__retroarch__', 'instalando o emulador')
         self.enfileirar(0, 'host:snesticle/title.cfg', f'{RA_PASTA}/title.cfg', '__retroarch__', 'instalando o emulador')
+        return 'ok'
+
+    def cinema_sms(self):
+        """🎞 Filmes e séries (23/10/2026): instala o SMS do cinema no pendrive (1ª vez na sessão), com o IPCONFIG.DAT da
+        box ao lado (o SMS lê o IP dali), e abre. Ele liga o UDPFS sozinho e acha o udpfs_nuvem.py desta box por
+        broadcast; os vídeos ficam em UDPFS → CINEMA-NUVEM. Mesmo rótulo em tudo: cópia que falha cancela a abertura."""
+        if not self.aberto():
+            return 'o navegador não está aberto no PS2'
+        if not self.sms_copiado:
+            for a in SMS_ARQS:
+                self.enfileirar(0, f'host:sms-cinema/{a}', f'{SMS_PASTA}/{a}', '__sms__', 'instalando o SMS')
+            if os.path.exists(os.path.join(PASTA_PS2, 'IPCONFIG.DAT')):
+                self.enfileirar(0, 'host:IPCONFIG.DAT', f'{SMS_PASTA}/IPCONFIG.DAT', '__sms__', 'instalando o SMS')
+        self.enfileirar(1, f'{SMS_PASTA}/SMS.ELF', '-', '__sms__', 'abrindo')
         return 'ok'
 
     def jogar(self, arquivo):
@@ -508,8 +729,72 @@ class Sessao:
             return   # (23/10) só marca como mostradas quando aparecem de verdade no PS2: nada se perde
         gravar(os.path.join(pasta, 'resumo-navegador.json'),
                json.dumps({'ate': max(d.get('quando') or 0 for d in hist)}).encode())
-        nomes = ', '.join(d.get('titulo') or '?' for d in novos[-3:]) + ('…' if len(novos) > 3 else '')
-        self.falar('trofeu-resumo', f'🏆 {len(novos)} conquista{"s" if len(novos) > 1 else ""}: {nomes}')
+        threading.Thread(target=self.mostrar_conquistas, args=(novos,), daemon=True).start()
+
+    def voz_conquistas(self, novos):
+        """plim + a frase: do Piper do notebook (/voz, com o nome do jogo); sem notebook, a gravada no pacote
+        (ps2/sons/conquistas-N.raw, só a contagem); no fim, a frase antiga."""
+        sons = os.path.join(PASTA_PS2, 'sons')
+        try:
+            plim = open(os.path.join(sons, 'plim.raw'), 'rb').read()
+        except OSError:
+            plim = b''
+        frase = frase_conquistas(novos)
+        try:
+            st, _, d = nuvem.pedir('POST', '/voz', json.dumps({'texto': frase}).encode(),
+                                   {'Content-Type': 'application/json'}, timeout=25)
+            if st == 200 and d:
+                return plim + bytes(4410) + d, frase
+            log('voz das conquistas: HTTP', st)
+        except OSError as e:
+            log('voz das conquistas:', e)
+        for nome in (f'conquistas-{len(novos)}.raw', 'trofeu-resumo.raw'):
+            try:
+                d = open(os.path.join(sons, nome), 'rb').read()
+                return (plim + bytes(4410) + d if nome != 'trofeu-resumo.raw' else d), frase
+            except OSError:
+                pass
+        return plim, frase
+
+    def mostrar_conquistas(self, novos):
+        """🏆 Conquistas de quando o navegador estava fechado (24/10/2026): a voz fala a contagem e o jogo, cada
+        conquista aparece na faixa (medalha, nome, descrição, pontos, ~4,5 s) e no fim o resumo da sessão.
+        ○ pula a fila."""
+        audio, frase = self.voz_conquistas(novos)
+        gravar(os.path.join(PASTA_PS2, 'aviso.raw'), audio)
+        self.aviso_seq = (self.ler_aviso_seq() + 1) & 0xFF
+        gravar(os.path.join(PASTA_PS2, 'aviso-seq.txt'), str(self.aviso_seq).encode())
+        self.pular_conquistas = False
+        self.mostrando_conquistas = True
+        try:
+            self.avisar('★ ' + frase, girando=False, cor=(255, 209, 102), segundos=max(4, len(audio) / 44100 + 1))
+            time.sleep(max(4, len(audio) / 44100 + 1))
+            fila = novos[-20:]
+            for k, c in enumerate(fila):
+                if self.pular_conquistas or not self.aberto():
+                    break
+                pts = c.get('pontos') or 0
+                self.avisar(f'★ {c.get("titulo") or "Conquista"}', girando=False, cor=(255, 209, 102), segundos=4.5)
+                self.aviso.update(sub=c.get('descricao') or '', icone=medalha_img(c.get('medalha')),
+                                  rodape=f'{pts} ponto{"s" if pts != 1 else ""} · {c.get("jogo") or ""} · '
+                                         f'{k + 1} de {len(fila)}   (○ pula)')
+                self.enviar_tela()
+                for _ in range(45):
+                    if self.pular_conquistas:
+                        break
+                    time.sleep(0.1)
+            if not self.pular_conquistas and self.aberto():
+                pts = sum(c.get('pontos') or 0 for c in novos)
+                jogos = sorted({c.get('jogo') for c in novos if c.get('jogo')})
+                self.avisar(f'★ Resumo: {len(novos)} conquista{"s" if len(novos) != 1 else ""}, {pts} pontos',
+                            girando=False, cor=(63, 185, 80), segundos=7)
+                self.aviso.update(sub=', '.join(jogos) or 'PS2', icone=None, rodape='Lista completa em Conquistas, na página inicial')
+                self.enviar_tela()
+        finally:
+            self.mostrando_conquistas = False
+            if self.pular_conquistas:
+                self.aviso = None
+                self.enviar_tela()
 
     # ---- 🏆 conquistas (23/10/2026): listas preparadas na box (ps2/ra/*.wl) vão sozinhas para o pendrive do PS2 ----
     def sincronizar_ra(self):
@@ -641,13 +926,14 @@ class Sessao:
             args += '|-cfg=pademu'
         self.enfileirar(1, 'host:neutrino/neutrino.elf', args, '__neutrino__', 'abrindo')
 
-    def enfileirar(self, op, origem, destino, rotulo, fase, depois=None):
+    def enfileirar(self, op, origem, destino, rotulo, fase, depois=None, tam=None):
         o, d = origem.encode(), destino.encode()
         if len(o) > 127 or len(d) > 127:
             return
         self.pedido_n += 1
-        try:   # host:video/remoto/... não existe aqui (vem do notebook pelo servidor_host.py)
-            tam = os.path.getsize(os.path.join(PASTA_PS2, origem[5:])) if origem.startswith('host:') else 0
+        try:   # host:nuvem/... não existe aqui (vem do notebook pelo servidor_host.py): tam vem de quem pediu
+            if tam is None:
+                tam = os.path.getsize(os.path.join(PASTA_PS2, origem[5:])) if origem.startswith('host:') else 0
         except OSError:
             tam = 0
         self.fila.append({'id': self.pedido_n, 'op': op, 'origem': o, 'destino': d, 'tamanho': tam,
@@ -655,6 +941,42 @@ class Sessao:
                           'depois': depois})
         if not self.pedido:
             self.proximo_pedido()
+
+    def listar_jogos_pendrive(self):
+        """💾 (24/10/2026) Lê mass:/DVD e mass:/CD do pendrive do PS2 (op 5) e acerta o ps2/no-ps2.json: entra o que
+        foi posto por outro caminho (PC, OPL Manager), sai o que foi apagado. As abas 💾 No pendrive e 🌐 Jogar
+        online do videos.py mostram essa lista. Pasta que não abriu (sem pendrive, sem a pasta) não mexe na lista."""
+        if not self.aberto():
+            return
+        os.makedirs(os.path.join(PASTA_PS2, 'arquivos'), exist_ok=True)
+        for pasta in ('DVD', 'CD'):
+            saida = os.path.join(PASTA_PS2, 'arquivos', f'pendrive-{pasta}.txt')
+            try:
+                os.remove(saida)
+            except OSError:
+                pass
+
+            def pronto(est, pasta=pasta, saida=saida):
+                if est != 2:
+                    log(f'pendrive do PS2: mass:/{pasta} não abriu ({ESTADOS_PEDIDO.get(est, est)})')
+                    return
+                try:
+                    linhas = open(saida, encoding='latin-1').read().splitlines()
+                except OSError:
+                    return
+                if any(l.split('\t')[1:2] == [''] for l in linhas):   # navegador.elf antigo: nomes vazios
+                    log(f'pendrive do PS2: lista de mass:/{pasta} veio sem nomes (navegador.elf antigo), não mexo')
+                    return
+                achados = {}
+                for l in linhas:
+                    partes = l.split('\t')
+                    if len(partes) == 3 and partes[0] == 'F' and partes[1].lower().endswith(('.iso', '.zso')):
+                        achados[partes[1]] = int(partes[2] or 0)
+                atualizar_jogos_ps2(pasta, achados)
+                log(f'pendrive do PS2: {len(achados)} jogo(s) em mass:/{pasta}')
+
+            self.enfileirar(5, f'mass:/{pasta}', f'host:arquivos/pendrive-{pasta}.txt', f'__listar_{pasta}__', 'listando',
+                            depois=pronto)
 
     def proximo_pedido(self):
         self.pedido = self.fila.pop(0) if self.fila else None
@@ -734,11 +1056,12 @@ class Sessao:
                         pass
                     self.proximo_pedido()
                 self.n_teclas = None
-                self.ra_copiado = False   # pode ser outro pendrive
+                self.ra_copiado = self.sms_copiado = False   # pode ser outro pendrive
                 threading.Timer(4, self.verificar_pendrive).start()
                 threading.Timer(7, self.sincronizar_ip).start()   # IP do config.json → IPCONFIG.DAT do pendrive
                 threading.Timer(10, self.sincronizar_ra).start()   # 🏆 listas de conquistas novas → pendrive do PS2
                 threading.Timer(12, self.resumo_desbloqueios).start()   # 🏆 o que foi desbloqueado no jogo
+                threading.Timer(15, self.listar_jogos_pendrive).start()   # 💾 lista real de mass:/DVD e mass:/CD
                 threading.Thread(target=self.enviar_tela, args=(True,), daemon=True).start()
             self.ult_entrada = time.time()
             botoes, cx, cy, rx, ry, seq, n_teclas, roda = struct.unpack('<HHHbbIHb', d[4:19])
@@ -768,10 +1091,12 @@ class Sessao:
                         p = self.pedido
                         if p['op'] == 0 and p['destino'].endswith(RA_ELF.encode()):
                             self.ra_copiado = est == 2
+                        if p['op'] == 0 and p['destino'] == f'{SMS_PASTA}/SMS.ELF'.encode():
+                            self.sms_copiado = est == 2
                             self.resultados['__retroarch__'] = {'op': 0, 'estado': novo, 'ok': est == 2, 't': time.time(),
                                                                 'no_pendrive': est == 2}
                         falhou = est not in (2, 7, 8)
-                        if falhou or p['fase'] in ('copiando', 'abrindo', 'apagando'):
+                        if falhou or p['fase'] in ('copiando', 'abrindo', 'apagando', 'central'):
                             antes = self.resultados.get(p['arquivo'], {})
                             self.resultados[p['arquivo']] = {'op': p['op'], 'estado': novo, 'ok': not falhou, 't': time.time(),
                                                             'no_pendrive': antes.get('no_pendrive') or (p['op'] == 0 and not falhou)
@@ -780,7 +1105,7 @@ class Sessao:
                             self.fila = [x for x in self.fila if x['arquivo'] != p['arquivo']]
                         alvo = (p['origem'] if p['op'] == 3 else p['destino']).decode(errors='ignore')
                         if est == 2 and p['op'] in (0, 3) and alvo.startswith('mass:/DVD/'):
-                            registrar_jogo_ps2(alvo[len('mass:/DVD/'):], p['op'] == 0)
+                            registrar_jogo_ps2(alvo[len('mass:/DVD/'):], p['op'] == 0, p['tamanho'])
                             if p['op'] == 0:   # "Sua cópia foi concluída." na TV
                                 nome = os.path.splitext(alvo[len('mass:/DVD/'):])[0]
                                 nome = nome[12:] if len(nome) > 12 and nome[4] == '_' and nome[11] == '.' else nome
@@ -851,7 +1176,7 @@ def cabecalho(seq, base, cmd, regs):
     return b'PST2' + struct.pack('<IIII', seq, base, cmd, sum(map(len, regs)))
 
 
-def registrar_jogo_ps2(arquivo, presente):
+def registrar_jogo_ps2(arquivo, presente, tam=0):
     """💾 Jogos no pendrive do PS2 (23/10/2026): o navegador não lista pastas do pendrive, então a box anota os ISOs
     que ela copiou para mass:/DVD/ (e tira os apagados) em ps2/no-ps2.json; o videos.py mostra a lista."""
     arq = os.path.join(PASTA_PS2, 'no-ps2.json')
@@ -860,9 +1185,23 @@ def registrar_jogo_ps2(arquivo, presente):
     except (OSError, ValueError):
         jogos = {}
     if presente:
-        jogos[arquivo] = {'quando': time.strftime('%d/%m/%Y %H:%M')}
+        jogos[arquivo] = {'quando': time.strftime('%d/%m/%Y %H:%M'), 'tam': tam}   # tam: Loja mostra o ocupado
     else:
         jogos.pop(arquivo, None)
+    gravar(arq, json.dumps(jogos, ensure_ascii=False, indent=1).encode())
+
+
+def atualizar_jogos_ps2(pasta, achados):
+    """Põe no no-ps2.json a lista lida de mass:/<pasta> ({arquivo: tamanho}), guardando a data de quem já estava."""
+    arq = os.path.join(PASTA_PS2, 'no-ps2.json')
+    try:
+        jogos = json.load(open(arq, encoding='utf-8'))
+    except (OSError, ValueError):
+        jogos = {}
+    jogos = {k: v for k, v in jogos.items() if v.get('pasta', 'DVD') != pasta or k in achados}
+    for nome, tam in achados.items():
+        j = jogos.setdefault(nome, {'quando': '', 'visto': time.strftime('%d/%m/%Y %H:%M')})
+        j.update(tam=tam or j.get('tam', 0), pasta=pasta)
     gravar(arq, json.dumps(jogos, ensure_ascii=False, indent=1).encode())
 
 
@@ -898,6 +1237,8 @@ def controle_um(sessao, c):
         c.sendall(b'ok\n' if sessao.sair() else b'fechado\n')
     elif pedido.startswith('copiar '):
         c.sendall((sessao.copiar(pedido[7:]) + '\n').encode())
+    elif pedido == 'sms':   # 🎞 Filmes e séries: SMS do cinema pelo UDPFS
+        c.sendall((sessao.cinema_sms() + '\n').encode())
     elif pedido == 'retroarch':
         c.sendall((sessao.instalar_ra() + '\n').encode())
     elif pedido.startswith('copiar2 ') or pedido.startswith('apagar '):   # cinema: arquivo ↔ pendrive do PS2
@@ -905,8 +1246,9 @@ def controle_um(sessao, c):
         if not sessao.aberto():
             c.sendall(b'o navegador nao esta aberto no PS2\n')
         elif partes[0] == 'copiar2' or pedido.startswith('copiar2'):
-            origem, destino, rotulo = partes
-            sessao.enfileirar(0, origem, destino, rotulo, 'copiando')
+            origem, destino, rotulo = partes[:3]   # 4º campo opcional: tamanho (ISO do notebook, host:nuvem/)
+            sessao.enfileirar(0, origem, destino, rotulo, 'copiando',
+                              tam=int(partes[3]) if len(partes) > 3 and partes[3].isdigit() else None)
             c.sendall(b'ok\n')
         else:
             destino, rotulo = partes
@@ -914,6 +1256,14 @@ def controle_um(sessao, c):
             c.sendall(b'ok\n')
     elif pedido.startswith('video '):
         c.sendall((sessao.video(pedido[6:].strip()) + '\n').encode())
+    elif pedido == 'conquistas-teste':   # teste da fila: as 3 últimas do histórico, sem marcar nada
+        try:
+            hist = json.load(open(os.path.join(PASTA_PS2, 'ra', 'desbloqueios.json'), encoding='utf-8'))
+        except (OSError, ValueError):
+            hist = []
+        if hist and sessao.aberto():
+            threading.Thread(target=sessao.mostrar_conquistas, args=(hist[-3:],), daemon=True).start()
+        c.sendall(b'ok\n' if hist and sessao.aberto() else b'sem historico ou navegador fechado\n')
     elif pedido == 'resumo':   # teste do resumo de conquistas do navegador
         sessao.resumo_desbloqueios()
         c.sendall(b'ok\n')
@@ -932,6 +1282,26 @@ def controle_um(sessao, c):
             c.sendall(b'o navegador nao esta aberto no PS2\n')
         else:
             sessao.enfileirar(4, 'mass0:exfat' if tipo == 'exfat' else 'mass0:', '-', '__formatar__', 'formatando')
+            c.sendall(b'ok\n')
+    elif pedido == 'listar-pendrive':   # 💾 relê mass:/DVD e mass:/CD (botão 🔄 das abas do pendrive)
+        if sessao.aberto():
+            sessao.listar_jogos_pendrive()
+        c.sendall(b'ok\n' if sessao.aberto() else b'o navegador nao esta aberto no PS2\n')
+    elif pedido == 'musica' or pedido.startswith('musica '):   # música da loja: estado|proxima|anterior|ligar|desligar|faixa <id>
+        c.sendall((sessao.musica_comando(pedido[7:].strip() or 'estado') + '\n').encode())
+    elif pedido.startswith('remoto '):   # controle remoto do celular (central.py): remoto {"tipo": ...}
+        c.sendall((sessao.remoto(json.loads(pedido[7:])) + '\n').encode())
+    elif pedido.startswith('op '):   # explorador do celular (central.py): op N|origem|destino|rótulo|tamanho
+        partes = pedido[3:].split('|')
+        op, origem, destino, rotulo = int(partes[0]), partes[1], partes[2] or '-', partes[3]
+        if op not in (0, 3, 5, 6, 7) or not rotulo.startswith('__central'):
+            c.sendall(b'op nao permitida\n')
+        elif not sessao.aberto():
+            c.sendall(b'o navegador nao esta aberto no PS2\n')
+        else:
+            sessao.resultados.pop(rotulo, None)
+            sessao.enfileirar(op, origem, destino, rotulo, 'central',
+                              tam=int(partes[4]) if len(partes) > 4 and partes[4].isdigit() else None)
             c.sendall(b'ok\n')
     elif pedido.startswith('neutrino '):
         c.sendall((sessao.neutrino(pedido[9:].strip()) + '\n').encode())
@@ -957,8 +1327,14 @@ def controle_um(sessao, c):
 def main():
     nav = Chromium()
     sessao = Sessao(nav)
+    if sessao.musica.get('ligada'):   # deixa uma faixa pronta em ps2/musica.raw
+        try:
+            sessao.musica_comando('ligar')
+        except Exception as e:
+            log('música da loja:', e)
     threading.Thread(target=controle, args=(sessao,), daemon=True).start()
     threading.Thread(target=sessao.vigiar_entrada, daemon=True).start()
+    threading.Thread(target=sessao.musica_ciclo, daemon=True).start()
     sessao.pagina = nav.foto()
     sessao.enviar_tela(True)
     log(f'navegador do PS2 pronto (arquivos em {PASTA_PS2}), página inicial {INICIO}')

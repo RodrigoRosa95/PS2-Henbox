@@ -57,6 +57,7 @@ public class Principal extends Activity {
         setContentView(rolagem);
 
         titulo(raiz, "PS2 Henbox", 22);
+        botao(raiz, "🎮 Central: capas, ISOs do celular, online, arquivos e controle", new Runnable() { public void run() { abrirCentral(); } });
         texto(raiz, "1. Conecte o celular no mesmo Wi-Fi da TV box (com ADB pela rede ligado). 2. Procure ou digite o IP. "
                 + "3. Conecte e aceite \"Permitir depuração\" na TV.");
         botao(raiz, "Instalar NESTA TV box (este aparelho, com root)", new Runnable() { public void run() { conectarAqui(); } });
@@ -65,7 +66,7 @@ public class Principal extends Activity {
         achadas = new LinearLayout(this);
         achadas.setOrientation(LinearLayout.VERTICAL);
         raiz.addView(achadas);
-        campoBox = campo(raiz, "IP da TV box (ex.: 192.168.4.121)", "");
+        campoBox = campo(raiz, "IP da TV box (ex.: 192.168.4.79)", "");
         botao(raiz, "Conectar", new Runnable() { public void run() { conectar(); } });
 
         titulo(raiz, "TV box", 18);
@@ -102,6 +103,11 @@ public class Principal extends Activity {
         pendrives = new LinearLayout(this);
         pendrives.setOrientation(LinearLayout.VERTICAL);
         raiz.addView(pendrives);
+
+        titulo(raiz, "🎵 Música da loja", 18);
+        texto(raiz, "Escolha uma música (MP3 e afins) no celular e ela vai para a pasta MUSICAS do pendrive da "
+                + "TV box; a box mesma converte para o som do PS2 (até 90 s) e a loja começa a tocar.");
+        botao(raiz, "🎵 Escolher uma música e enviar ao pendrive da TV box", new Runnable() { public void run() { escolherMusica(); } });
 
         titulo(raiz, "🏆 Conquistas (RetroAchievements)", 18);
         texto(raiz, "O xeRAbora (app oficial do autor, baixado do GitHub dele) acompanha as conquistas no PS2 real; "
@@ -341,6 +347,97 @@ public class Principal extends Activity {
             caixa.iniciar(); caixa.esperar(20000); mostrarEstado(); } });
     }
 
+    // ---- 🎵 música da loja: escolhe no celular e envia à pasta MUSICAS do pendrive da box (24/10/2026) ----
+    android.net.Uri musicaUri = null;
+    String musicaNome = "";
+
+    void escolherMusica() {
+        if (caixa == null) { escrever("Conecte numa TV box primeiro."); return; }
+        android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(android.content.Intent.CATEGORY_OPENABLE);
+        i.setType("audio/*");
+        i.putExtra(android.content.Intent.EXTRA_MIME_TYPES,
+                new String[] {"audio/*", "application/ogg", "application/octet-stream"});
+        try {
+            startActivityForResult(i, 20);
+        } catch (Exception e) {
+            escrever("Não abriu o seletor de arquivos: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, android.content.Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != 20 || res != RESULT_OK || data == null || data.getData() == null) return;
+        musicaUri = data.getData();
+        musicaNome = nomearMusica(musicaUri);
+        tarefa(new Tarefa() { public void rodar() throws Exception { enviarMusica(); } });
+    }
+
+    /** Nome do arquivo como o usuário o tem (OpenableColumns.DISPLAY_NAME); sem ele, o fim do URL. */
+    String nomearMusica(android.net.Uri u) {
+        try {
+            android.database.Cursor c = getContentResolver().query(u,
+                    new String[] {android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null);
+            if (c != null) {
+                if (c.moveToFirst()) {
+                    String n = c.getString(0);
+                    c.close();
+                    if (n != null && n.trim().length() > 0) return n;
+                } else {
+                    c.close();
+                }
+            }
+        } catch (Exception e) { }
+        return u.getLastPathSegment() == null ? "musica.mp3" : u.getLastPathSegment();
+    }
+
+    /** Manda o arquivo (o Caixa copia ao pendrive como root) e pede à box para converter na hora. */
+    void enviarMusica() throws Exception {
+        String destino;
+        java.io.InputStream in = getContentResolver().openInputStream(musicaUri);
+        if (in == null) throw new java.io.IOException("não abri a música (formato ou permissão)");
+        try {
+            escrever("🎵 Enviando " + musicaNome + " para " + boxConectada + "…");
+            destino = caixa.enviarMusica(musicaNome, in);
+        } finally {
+            in.close();
+        }
+        escrever("🎵 Gravada em " + destino + ". Convertendo…");
+        String r = pedirHttp("http://" + ipBox() + ":8780/loja/api/musica?acao=atualizar");
+        try {
+            JSONObject j = new JSONObject(r.substring(r.indexOf('{')));
+            JSONObject f = j.optJSONObject("faixa");
+            escrever("🎵 Loja: " + (j.opt("total") != null ? j.getInt("total") : 0) + " faixa(s) · " + (f != null ? f.optString("titulo") : "sem faixa")
+                    + (j.optBoolean("ligada") ? "" : " (desligada — toque o 🔈 na loja)"));
+        } catch (Exception e) {
+            escrever("🎵 A box converte sozinha em até 10 min. (confirmei falhou: " + e.getMessage() + ")");
+        }
+    }
+
+    /** IP para a página da box: o do ADB, ou ela mesma se o app está rodando na TV box. */
+    String ipBox() {
+        return boxConectada.matches("\\d+\\.\\d+\\.\\d+\\.\\d+") ? boxConectada : "127.0.0.1";
+    }
+
+    String pedirHttp(String url) throws Exception {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(300000);   // a conversão do ffmpeg (até 90 s de áudio) pode demorar na hora
+        c.setRequestProperty("User-Agent", "ps2nav-apk/1.0");
+        try {
+            java.io.InputStream i = c.getResponseCode() >= 400 ? c.getErrorStream() : c.getInputStream();
+            java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while (i != null && (n = i.read(buf)) > 0) b.write(buf, 0, n);
+            if (i != null) i.close();
+            return b.toString("UTF-8");
+        } finally {
+            c.disconnect();
+        }
+    }
+
     void listarPendrives() throws Exception {
         final String[] linhas = caixa.pendrives();
         ui.post(new Runnable() { public void run() {
@@ -368,6 +465,15 @@ public class Principal extends Activity {
                                     escrever("Pendrive: " + caixa.prepararPendrive(c[0], true)); } }); } }).show(); } });
             }
         } });
+    }
+
+    /** Central do celular (24/10/2026): a página do central.py da box num WebView (Central.java). */
+    void abrirCentral() {
+        android.content.Intent i = new android.content.Intent(this, Central.class);
+        if (boxConectada.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) i.putExtra("box", boxConectada);
+        else if (boxConectada.equals("esta TV box")) i.putExtra("box", "127.0.0.1");
+        else if (!Conquistas.tvbox(this).isEmpty()) i.putExtra("box", Conquistas.tvbox(this));
+        startActivity(i);
     }
 
     void abrirConquistas() {

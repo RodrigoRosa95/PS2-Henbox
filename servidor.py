@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Página do monitor PS2 + TV box (http://127.0.0.1:8770) — pedido do usuário 16/10/2026.
+"""Página do monitor PS2 Henbox (antes "PS2 + TV box") (http://127.0.0.1:8770) — pedido do usuário 16/10/2026.
 
 Arquivos estáticos desta pasta (index.html, status.json gravado pelo monitor-ps2-tvbox.sh, capas/) e uma API:
   GET  /api/jogos    jogos da pasta DVD do pendrive da TV box, com capa (baixa as que faltam em segundo plano)
@@ -19,7 +19,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 PASTA = os.path.dirname(os.path.abspath(__file__))
 CAPAS = os.path.join(PASTA, 'capas')
 SCRIPT = os.path.expanduser('~/.local/bin/ps2-proximo-jogo.sh')
-TVBOX, PS2_FTP = os.environ.get('PS2_TVBOX', '192.168.4.121'), os.environ.get('PS2_FTP', '192.168.4.230')
+TVBOX, PS2_FTP = os.environ.get('PS2_TVBOX', '192.168.4.79'), os.environ.get('PS2_FTP', '192.168.4.230')
 PS2LINK = PS2_FTP  # PS2Link e wLaunchELF usam o mesmo IP fixo
 _cache = {'t': 0, 'jogos': []}
 _trava = threading.Lock()
@@ -188,6 +188,8 @@ class Pagina(SimpleHTTPRequestHandler):
             except Exception as e:
                 return self._json({'erro': str(e)}, 500)
             return self._json({'erro': 'não encontrado'}, 404)
+        if self.path.split('?')[0] in ('/api/online', '/loja/api/online'):
+            return self._json(jogos_online.catalogo())
         if self.path.startswith('/api/loja/snes'):
             return self._json(snes())
         if self.path.startswith('/api/loja'):
@@ -284,6 +286,15 @@ class Pagina(SimpleHTTPRequestHandler):
                 return self._json({'ok': False, 'msg': 'pedido inválido'}, 400)
             ok, msg = acao(os.path.basename(arq))
             return self._json({'ok': ok, 'msg': msg})
+        if self.path.startswith('/api/online/instalar') or self.path.startswith('/loja/api/online/instalar'):
+            # clicou no jogo da aba 🌐 Games Online da loja: instala o ISO pela fila da loja + o kit do VMC já
+            # estava auto-aprovado (jogos_online baixa e aprova na varredura); 1 clique = ISO no pendrive + VMC
+            try:
+                corpo = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0)) or 0) or b'{}')
+            except ValueError:
+                corpo = {}
+            ok, msg = jogos_online.instalar(str(corpo.get('id') or corpo.get('arquivo') or ''))
+            return self._json({'ok': ok, 'msg': msg})
         if self.path.startswith('/api/jogar') or self.path.startswith('/api/sistema'):
             try:
                 corpo = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0)) or 0) or b'{}')
@@ -310,7 +321,9 @@ class Pagina(SimpleHTTPRequestHandler):
         return self._json({'ok': r.returncode == 0, 'msg': (r.stdout or r.stderr).strip()})
 
 
-import chaves, cinema, estatisticas, loja, painel_ha, temperatura, voz  # noqa: E402  (usam jogos/jogar/sistema daqui)
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'navegador'))   # jogos_online vive no navegador
+import chaves, cinema, estatisticas, jogos_online, loja, painel_ha, temperatura, voz  # noqa: E402  (usam jogos/jogar/sistema daqui)
 
 _baixando = set()
 

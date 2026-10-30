@@ -37,3 +37,9 @@ navegador/publicado/
 navegador/pendrive.zip
 pendrive_atual.elf
 MC-NUVEM/
+# chave do APK público, instaladores de convidados e dados locais (30/10/2026)
+navegador/instalador/chave-publica.txt
+navegador/instalador/convidados/
+navegador/eventos_online.json
+navegador/ps2/trilhas/
+.aider*

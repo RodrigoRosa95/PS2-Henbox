@@ -5,7 +5,9 @@ MD5 do nome do executável de boot (BOOT2 do SYSTEM.CNF, sem "cdrom0:\\" e sem "
 
 Uso: ra_hash.py <arquivo.iso>   → imprime "<hash> <executável>"
 """
+import contextlib
 import hashlib
+import os
 import struct
 import sys
 
@@ -51,7 +53,9 @@ def achar(f, caminho):
 
 
 def hash_ps2(caminho_iso):
-    with open(caminho_iso, 'rb') as f:
+    """caminho_iso: caminho ou arquivo já aberto (read/seek), ex.: o IsoRemoto do udpfs_nuvem.py (ISO do notebook)."""
+    with (open(caminho_iso, 'rb') if isinstance(caminho_iso, (str, bytes, os.PathLike))
+          else contextlib.nullcontext(caminho_iso)) as f:
         cnf = achar(f, 'SYSTEM.CNF')
         if not cnf:
             raise ValueError('SYSTEM.CNF não encontrado')

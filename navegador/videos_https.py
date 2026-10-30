@@ -3,8 +3,12 @@
 
 Serve, só para leitura e só com a chave, a loja, as ROMs, os ISOs e o memory card. Em casa a TV box usa direto
 http://192.168.4.135:8781; fora de casa, https://ps2videos.rodrigoflix.com (túnel Cloudflare → esta porta).
-Os VÍDEOS por aqui (/lista e /arquivo, para o player do navegador) foram retirados em 22/10/2026: pelo HTTPS o vídeo
-travava demais no PS2.
+Os VÍDEOS do player do navegador por aqui (/lista, /arquivo) foram retirados em 22/10/2026 a pedido do usuário: pelo
+HTTPS o vídeo travava demais no PS2.
+Cinema na nuvem para o SMS Player (22/10, religado 23/10/2026 a pedido do usuário, pela Cloudflare): GET /cinema/lista
+→ [{"nome", "tam"}] e GET|HEAD /cinema/<arquivo> (Range) = vídeos já no formato do SMS (AVI XviD/DivX + MP3, MPEG) da
+pasta PS2/CINEMA-NUVEM; o udpfs_nuvem.py da TV box mostra essa pasta ao SMS como udpfs:/CINEMA-NUVEM e lê o vídeo
+aos pedaços enquanto toca (o SMS tem buffer próprio; o player do navegador é que travava).
   GET  /loja/<caminho>        → a loja do ps2-web (só leitura: página, catálogo, capas), para a TV box mostrar
   GET  /rom/<arquivo>         → ROM de SNES (a TV box baixa antes de gravar no pendrive do PS2)
   GET  /iso/DVD|CD/<arquivo>  → ISO de jogo de PS2 (Range; HEAD), lido aos pedaços pelo udpfs_nuvem.py da TV box
@@ -22,18 +26,22 @@ Teste de velocidade (22/10/2026): GET /teste = página que mede, no navegador do
 lendo um ISO daqui; o resultado volta por POST /teste/resultado e fica em teste_velocidade.log.
 Memory card na nuvem (22/10/2026): GET/PUT /mc/<nome>.bin = o cartão da chave usada (PS2/MC-NUVEM/<id da chave>/),
 corpo gzip; X-Versao = SHA-256 do conteúdo (16 hex). Cada PUT guarda a versão anterior em antigos/ (as 10 últimas).
+Evento online (23/10/2026): GET /eventos = partidas marcadas pelo evento_online.py (jogo, horário, DNS, servidor); a
+TV box busca a cada 5 min e desvia o DNS do PS2 na janela do evento.
 Atualização (22/10/2026): GET /atualizacao/versao.json e /atualizacao/navegador.elf = o que estiver em publicado/
 (só o que for copiado para lá de propósito; a TV box baixa e regrava o pendrive do PS2).
 """
-import gzip, hashlib, hmac, json, os, re, secrets, shutil, sys, threading, time, urllib.error, urllib.parse, urllib.request
+import gzip, hashlib, hmac, json, os, re, secrets, shutil, subprocess, sys, threading, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ARQ_CHAVE = os.environ.get('PS2_CHAVE_ARQ') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos_https.chave')   # Docker: /dados
 PORTA = int(sys.argv[1]) if len(sys.argv) > 1 else 8781
 JOGOS = os.environ.get('PS2_JOGOS', '/media/rodrigo/01TERA/PS2')
+CINEMA = os.environ.get('PS2_CINEMA', os.path.join(JOGOS, 'CINEMA-NUVEM'))
+CINEMA_OK = re.compile(r'^[^/\\]+\.(avi|divx|xvid|mp4|m4v|mpg|mpeg|m2v|vob|mkv|mp3|ogg)$', re.I)
 SNES = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ps2', 'snes')
 PS2_WEB = 'http://127.0.0.1:8770'
-LOJA_OK = re.compile(r'^(loja\.html|temperatura\.js|api/loja|api/loja/snes|api/ps2/temperatura|capas/[^?#]+\.(jpg|png))$')
+LOJA_OK = re.compile(r'^(loja\.html|temperatura\.js|api/loja|api/loja/snes|api/online(/instalar)?|api/ps2/temperatura|capas/[^?#]+\.(jpg|png))$')
 
 if not os.path.exists(ARQ_CHAVE):
     with open(os.open(ARQ_CHAVE, os.O_WRONLY | os.O_CREAT, 0o600), 'w') as f:
@@ -121,6 +129,31 @@ def gravar_uso():
         os.replace(tmp, ARQ_USO)
 
 
+
+# ---------- voz (24/10/2026): Piper pt_BR faber do assistente do Xoom, PCM 16 bits mono 22050 Hz (o som do PS2) ----------
+PIPER = os.path.expanduser('~/xoom-assistente/venv/bin/piper')
+VOZ_MODELO = os.path.expanduser('~/xoom-assistente/modelos/pt_BR-faber-medium.onnx')
+VOZ_CACHE = os.path.join(AQUI, 'voz-cache')
+
+
+def voz_pcm(texto):
+    """Frase em PCM cru (guardada por 30 dias: o mesmo resumo pedido de novo não roda o Piper outra vez)."""
+    os.makedirs(VOZ_CACHE, exist_ok=True)
+    arq = os.path.join(VOZ_CACHE, hashlib.sha256(texto.encode()).hexdigest()[:24] + '.raw')
+    if os.path.exists(arq):
+        return open(arq, 'rb').read()
+    r = subprocess.run([PIPER, '-m', VOZ_MODELO, '--output-raw'], input=texto.encode(), capture_output=True, timeout=60)
+    if r.returncode or not r.stdout:
+        raise OSError('piper: ' + r.stderr.decode(errors='replace')[-200:])
+    with open(arq + '.tmp', 'wb') as f:
+        f.write(r.stdout)
+    os.replace(arq + '.tmp', arq)
+    for velho in os.listdir(VOZ_CACHE):
+        c = os.path.join(VOZ_CACHE, velho)
+        if time.time() - os.path.getmtime(c) > 30 * 86400:
+            os.remove(c)
+    return r.stdout
+
 class H(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'   # conexão reaproveitada: a box pede pedaços seguidos
 
@@ -178,6 +211,13 @@ class H(BaseHTTPRequestHandler):
         if self.path == '/teste' and self.command in ('GET', 'HEAD'):
             return self.responder(200, open(os.path.join(AQUI, 'teste_velocidade.html'), 'rb').read(),
                                   'text/html; charset=utf-8', {'Cache-Control': 'no-store'})
+        if self.path.startswith('/instalador?') and self.command in ('GET', 'HEAD'):
+            # instalador da TV box com a chave do convidado embutida (instalador/convidados/<id>.apk); some ao revogar
+            cid = chave_id(urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('chave', [''])[0])
+            apk = os.path.join(AQUI, 'instalador', 'convidados', f'{cid}.apk')
+            if not cid or cid == 'principal' or not os.path.isfile(apk):
+                return self.responder(403, b'{"erro": "chave"}')
+            return self.arquivo(apk, 'InstaladorPS2.apk')
         self.cid = chave_id(self.headers.get('X-Chave', ''))
         if not self.cid:
             return self.responder(403, b'{"erro": "chave"}')
@@ -205,6 +245,35 @@ class H(BaseHTTPRequestHandler):
             with open(ARQ_TESTE, 'a') as f:
                 f.write(json.dumps(r, ensure_ascii=False) + '\n')
             return self.responder(200, b'{"ok": true}')
+        if self.path == '/voz' and self.command == 'POST':   # frase falada para o PS2 (conquistas, 24/10/2026)
+            try:
+                texto = json.loads(self.rfile.read(min(int(self.headers.get('Content-Length', 0)), 4096)) or b'{}')['texto']
+                return self.responder(200, voz_pcm(str(texto)[:300]), 'application/octet-stream')
+            except (ValueError, KeyError):
+                return self.responder(400, b'{"erro": "texto"}')
+            except (OSError, subprocess.SubprocessError) as e:
+                return self.responder(500, json.dumps({'erro': str(e)}).encode())
+        if self.path == '/eventos':   # evento online (evento_online.py): a TV box liga o DNS do evento na hora certa
+            import evento_online
+            evs = [{k: e.get(k) for k in ('id', 'jogo', 'inicio', 'dns', 'servidor', 'tutoriais')}
+                   | {'antes': evento_online.ANTES, 'depois': evento_online.DEPOIS}
+                   for e in evento_online.proximos(evento_online.ler_eventos())]
+            return self.responder(200, json.dumps(evs, ensure_ascii=False).encode())
+        if self.path == '/cinema/lista':
+            itens = []
+            if os.path.isdir(CINEMA):
+                for nome in sorted(os.listdir(CINEMA)):
+                    caminho = os.path.join(CINEMA, nome)
+                    if CINEMA_OK.match(nome) and os.path.isfile(caminho):
+                        itens.append({'nome': nome, 'tam': os.path.getsize(caminho)})
+            return self.responder(200, json.dumps(itens, ensure_ascii=False).encode())
+        m = re.match(r'^/cinema/([^/]+)$', self.path)
+        if m:
+            nome = os.path.basename(urllib.parse.unquote(m.group(1)))
+            caminho = os.path.join(CINEMA, nome)
+            if not CINEMA_OK.match(nome) or not os.path.isfile(caminho):
+                return self.responder(404, b'{"erro": "video nao encontrado"}')
+            return self.arquivo(caminho)
         if self.path.startswith('/loja/'):
             return self.loja(self.path[len('/loja/'):].split('?')[0])
         m = re.match(r'^/iso/(DVD|CD)/([^/]+)$', self.path)
@@ -299,7 +368,7 @@ class H(BaseHTTPRequestHandler):
             return self.responder(502, b'{"erro": "ps2-web fora do ar"}')
         self.responder(200, dados, tipo, {'Cache-Control': 'max-age=86400' if caminho.startswith('capas/') else 'no-store'})
 
-    def arquivo(self, caminho):
+    def arquivo(self, caminho, nome=None):
         tam = os.path.getsize(caminho)
         ini, fim = 0, tam - 1
         r = re.match(r'^bytes=(\d+)-(\d*)$', self.headers.get('Range', ''))
@@ -310,7 +379,10 @@ class H(BaseHTTPRequestHandler):
                 return self.responder(416, extra={'Content-Range': f'bytes */{tam}'})
         n = fim - ini + 1 if tam else 0
         self.send_response(206 if r else 200)
-        self.send_header('Content-Type', 'application/octet-stream')
+        self.send_header('Content-Type', 'application/vnd.android.package-archive' if nome and nome.endswith('.apk')
+                         else 'application/octet-stream')
+        if nome:
+            self.send_header('Content-Disposition', f'attachment; filename="{nome}"')
         self.send_header('Content-Length', str(n))
         self.send_header('Accept-Ranges', 'bytes')
         if r:

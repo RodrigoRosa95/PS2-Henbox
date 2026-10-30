@@ -12,7 +12,7 @@ import hashlib, os, re, socket, subprocess, threading, time
 
 # configurável (servidor/servidor.env, 18/10/2026): pasta da coleção (com DVD/ e CD/), IP da TV box e o pendrive dela
 ORIGEM = os.path.join(os.environ.get('PS2_JOGOS', '/media/rodrigo/01TERA/PS2'), 'DVD')
-TVBOX = os.environ.get('PS2_TVBOX', '192.168.4.121')
+TVBOX = os.environ.get('PS2_TVBOX', '192.168.4.79')
 PEN = os.environ.get('PS2_TVBOX_USB', '/mnt/media_rw/1E0A-1F18')
 ADB = ['adb', '-s', f'{TVBOX}:5555', 'shell']
 PORTA_NC = 9771
@@ -47,23 +47,43 @@ def regiao(jid):
     return '—'
 
 
+_pen_cache = {'isos': {}, 'livre': 0, 'total': 0}
+
+
 def pendrive():
-    """({arquivo: tamanho} dos ISOs no pendrive, livre_bytes, total_bytes)."""
-    saida = _sh(f'cd {PEN}/DVD && for f in *.iso *.ISO; do [ -f "$f" ] && echo "$(stat -c %s "$f")|$f"; done; '
-                f'echo "DF|$(df {PEN} | tail -1)"')
-    isos, livre, total = {}, 0, 0
-    for linha in saida.splitlines():
-        t, _, nome = linha.partition('|')
-        if t == 'DF':
-            p = nome.split()
-            total, livre = int(p[1]) * 1024, int(p[3]) * 1024
-        elif t.isdigit():
-            isos[nome] = int(t)
-    return isos, livre, total
+    """({arquivo: tamanho} dos ISOs no pendrive, livre_bytes, total_bytes, ok).
+
+    Comparação de nomes SEM caixa (case-insensitive: FAT32 guarda como foi copiado, HD e pendrive
+    podem diferir em maiúsculas/minúsculas do mesmo jogo).
+
+    ok=False quando a TV box não responde (adb fora do ar): devolve a última leitura boa em cache,
+    e a loja mostra "sem resposta" em vez de mentir com "0 livres / 0 instalados" (que levava a
+    instalar o mesmo jogo de novo achando que o pendrive estava vazio).
+    """
+    try:
+        saida = _sh(f'cd {PEN}/DVD && for f in *.iso *.ISO; do [ -f "$f" ] && echo "$(stat -c %s "$f")|$f"; done; '
+                    f'echo "DF|$(df {PEN} | tail -1)"')
+        isos, livre, total, achou_df = {}, 0, 0, False
+        for linha in saida.splitlines():
+            t, _, nome = linha.partition('|')
+            if t == 'DF':
+                p = nome.split()
+                total, livre = int(p[1]) * 1024, int(p[3]) * 1024
+                achou_df = True
+            elif t.isdigit():
+                isos[nome] = int(t)
+        if not achou_df:
+            raise RuntimeError('TV box sem resposta (sem espaço de disco no df).')
+        _pen_cache.update(isos=dict(isos), livre=livre, total=total)
+        return isos, livre, total, True
+    except Exception:
+        c = _pen_cache
+        return dict(c['isos']), c['livre'], c['total'], False
 
 
 def catalogo():
-    no_pen, livre, total = pendrive()
+    no_pen, livre, total, ok = pendrive()
+    no_pen_cx = {a.lower(): tam for a, tam in no_pen.items()}
     jogos = []
     nomes = set()
     for arq in sorted(os.listdir(ORIGEM) if os.path.isdir(ORIGEM) else [], key=str.lower):
@@ -72,19 +92,20 @@ def catalogo():
         caminho = os.path.join(ORIGEM, arq)
         st = os.stat(caminho)
         jid, nome = id_nome(arq)
-        nomes.add(arq)
+        nomes.add(arq.lower())
         jogos.append({'arquivo': arq, 'id': jid, 'nome': nome, 'tamanho': st.st_size, 'novo': int(st.st_mtime),
-                      'regiao': regiao(jid), 'instalado': no_pen.get(arq) == st.st_size,
+                      'regiao': regiao(jid), 'instalado': no_pen_cx.get(arq.lower(), -1) == st.st_size,
                       'so_pendrive': False, 'cabe_fat32': st.st_size <= FAT32_MAX})
     for arq, tam in no_pen.items():   # jogos que só existem no pendrive (não dá para desinstalar)
-        if arq not in nomes:
+        if arq.lower() not in nomes:
             jid, nome = id_nome(arq)
             jogos.append({'arquivo': arq, 'id': jid, 'nome': nome, 'tamanho': tam, 'novo': 0, 'regiao': regiao(jid),
                           'instalado': True, 'so_pendrive': True, 'cabe_fat32': True})
+    jogos.sort(key=lambda j: j['arquivo'].lower())   # ✔ antes os "só pendrive" iam todos para o fim da lista
     for j in jogos:
         j['capa'] = _ganchos['capa'](j['id']) if j['id'] else ''
         j['estado'] = dict(_estado.get(j['arquivo'], {}))
-    return {'jogos': jogos, 'livre': livre, 'total': total, 'fila': list(_fila)}
+    return {'jogos': jogos, 'livre': livre, 'total': total, 'box': ok, 'fila': list(_fila)}
 
 
 # ---------------- instalar ----------------
@@ -128,7 +149,7 @@ def _copiar(arq):
     tam = os.path.getsize(origem)
     destino = f'{PEN}/DVD/{arq}'
     parte = f'{PEN}/DVD/.instalando.part'
-    _, livre, _ = pendrive()
+    _, livre, _, _ = pendrive()
     if tam + FOLGA > livre:
         raise RuntimeError(f'Falta espaço no pendrive: precisa de {tam / 1024**3:.1f} GB, '
                            f'livre {livre / 1024**3:.1f} GB. Desinstale algum jogo.')
@@ -246,7 +267,7 @@ def _trabalhador():
 def desinstalar(arq):
     arq = os.path.basename(arq)
     origem = os.path.join(ORIGEM, arq)
-    no_pen, _, _ = pendrive()
+    no_pen, _, _, _ = pendrive()
     if arq not in no_pen:
         return False, 'Não está instalado.'
     if not os.path.isfile(origem) or os.path.getsize(origem) != no_pen[arq]:

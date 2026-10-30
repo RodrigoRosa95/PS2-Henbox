@@ -39,6 +39,29 @@ def log(*a):
 # para o pendrive dele (o OPL-RA só tem conquistas com o jogo no USB do próprio console). Na prática só leitura: o
 # Android não deixa o Termux gravar no pendrive USB.
 JOGOS_BOX = os.path.join(RAIZ, 'jogos-box')
+# Loja (23/10/2026): host:nuvem/DVD/<jogo>.iso = ISO do HD do notebook (IsoRemoto do udpfs_nuvem.py, rede de casa ou
+# HTTPS), para o PS2 copiar para o pendrive dele sem o jogo passar antes pelo pendrive da box. Só leitura.
+NUVEM = re.compile(r'^nuvem/(DVD|CD)/([^/]+)$')
+# Central do celular (24/10/2026): host:celular/DVD/<jogo>.iso = ISO servido pelo app do celular (udpfs_nuvem.iso_celular),
+# para o PS2 copiar direto para o pendrive dele. Só leitura.
+CELULAR = re.compile(r'^celular/(DVD|CD)/([^/]+)$')
+
+
+def abrir_nuvem(nome):
+    try:
+        import udpfs_nuvem   # só aqui: puxa o udpfs_server.py (~/udpfs_server), que só a box tem
+    except ImportError as e:
+        raise OSError(str(e))
+    m = NUVEM.match(nome)
+    return udpfs_nuvem.IsoRemoto(f'{m.group(1)}/{m.group(2)}')
+
+
+def abrir_celular(nome):
+    try:
+        import udpfs_nuvem
+    except ImportError as e:
+        raise OSError(str(e))
+    return udpfs_nuvem.iso_celular(CELULAR.match(nome).group(2))
 
 
 def caminho(nome):
@@ -109,8 +132,13 @@ def servir(s):
                 try:
                     if nome.startswith('host:'):
                         nome = nome[5:].lstrip('/')
-                    r = novo(os.open(caminho(corpo[4:]), flags_os(fl), 0o644), fds)
-                    if nome not in ('dif.bin', 'completa.bin', 'entrada.bin', 'pedido.bin', 'temperatura.txt'):
+                    if NUVEM.match(nome) or CELULAR.match(nome):
+                        if fl & 3 != 1:
+                            raise PermissionError(nome)
+                        r = novo(abrir_nuvem(nome) if NUVEM.match(nome) else abrir_celular(nome), fds)
+                    else:
+                        r = novo(os.open(caminho(corpo[4:]), flags_os(fl), 0o644), fds)
+                    if nome not in ('dif.bin', 'completa.bin', 'entrada.bin', 'pedido.bin', 'temperatura.txt', 'cursor.bin'):
                         log('abriu', nome)
                 except OSError as e:
                     r = -1
@@ -120,14 +148,14 @@ def servir(s):
                 r = -1
                 if fd in fds:
                     f = fds.pop(fd)
-                    os.close(f)
+                    f.close() if hasattr(f, 'close') else os.close(f)
                     r = 0
                 resp(0xbabe0122, r)
             elif cmd == 0xbabe0131:   # read
                 fd, n = struct.unpack('>ii', corpo[:8])
                 try:
                     f = fds[fd]
-                    dados = os.read(f, max(0, n))
+                    dados = f.read(max(0, n)) if hasattr(f, 'read') else os.read(f, max(0, n))
                     resp(0xbabe0132, len(dados), len(dados), extra=dados, conta_extra=False)
                 except (KeyError, OSError):
                     resp(0xbabe0132, -1, 0)
@@ -136,14 +164,14 @@ def servir(s):
                 dados = receber(s, n)
                 try:
                     r = os.write(fds[fd], dados)
-                except (KeyError, OSError):
+                except (KeyError, OSError, TypeError):   # TypeError: arquivo da nuvem (só leitura)
                     r = -1
                 resp(0xbabe0142, r)
             elif cmd == 0xbabe0151:   # lseek
                 fd, ofs, de = struct.unpack('>iii', corpo[:12])
                 try:
                     f = fds[fd]
-                    r = os.lseek(f, ofs, de)
+                    r = f.seek(ofs, de) if hasattr(f, 'seek') else os.lseek(f, ofs, de)
                 except (KeyError, OSError):
                     r = -1
                 resp(0xbabe0152, r)
@@ -191,7 +219,7 @@ def servir(s):
                 return
     finally:
         for f in fds.values():
-            os.close(f)
+            f.close() if hasattr(f, 'close') else os.close(f)
 
 
 def redes_locais():
