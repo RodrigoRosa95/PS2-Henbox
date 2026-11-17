@@ -102,6 +102,7 @@ Teste com os seus próprios jogos; a [loja de demonstração](#como-as-peças-se
 - [Conquistas RetroAchievements](docs/conquistas.md) — preparação automática, OPL-RA do Henbox e página de conquistas
 - [Central do celular, conquistas acumuladas e música](docs/central-celular.md) — novidades de 24/10/2026
 - [Guia para novo usuário](docs/guia-novo-usuario.md) — uso, controles, problemas comuns e roteiro de apresentação
+- [⚽ PES 14: transferências](pes14/README.md) — subprojeto: o botão do navegador que baixa o Option File do PES 2014 já com as transferências atuais e grava no memory card, com backup e conferência
 
 ## Estrutura
 
@@ -119,6 +120,7 @@ Teste com os seus próprios jogos; a [loja de demonstração](#como-as-peças-se
 | `navegador/atualizar.py` | atualização automática da box pela pasta `downloads/` |
 | `conquistas/opl-ra/` | OPL-RA do Henbox (fork AFL-3.0 do OPL do xeRAbora): patches e compilação; pronto em `downloads/OPL-RA-Henbox.ELF` |
 | `servidor/` | servidor em nuvem: `instalar.sh` (Linux), `Dockerfile`/`docker-compose.yml`, `parear.py` (QR) |
+| `pes14/` | subprojeto **PES 14**: gerador do save (notebook), módulo `pes14.py` da TV box, formato do Option File e testes — veja [pes14/README.md](pes14/README.md) |
 | `lancador/` | `abrir.elf`: abre um ELF do memory card a partir do PS2Link |
 | raiz | loja e cinema do notebook (`servidor.py`, `loja.html`, `cinema.py`…) |
 

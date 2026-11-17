@@ -1,0 +1,16 @@
+# dados do jogo / de terceiros: nunca vão para o repositório
+original/
+novo/
+publicado/
+ref/
+opcao_decifrada.bin
+nomes.txt
+plano_transferencias.csv
+log_geracao.json
+atualizar*.log
+shots/
+xdg/
+ven/
+__pycache__/
+notebook/tm/*
+!notebook/tm/mapa_clubes.json

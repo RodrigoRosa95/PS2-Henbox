@@ -1,0 +1,758 @@
+{
+"0": {
+"jogo": "ARSENAL FC",
+"tm": "Arsenal FC",
+"slug": "fc-arsenal",
+"id": "11"
+},
+"1": {
+"jogo": "NEWCASTLE UNITED",
+"tm": "Newcastle United",
+"slug": "newcastle-united",
+"id": "762"
+},
+"2": {
+"jogo": "AFC BOURNEMOUTH",
+"tm": "AFC Bournemouth",
+"slug": "afc-bournemouth",
+"id": "989"
+},
+"3": {
+"jogo": "CHELSEA FC",
+"tm": "Chelsea FC",
+"slug": "fc-chelsea",
+"id": "631"
+},
+"4": {
+"jogo": "CRYSTAL PALACE",
+"tm": "Crystal Palace",
+"slug": "crystal-palace",
+"id": "873"
+},
+"5": {
+"jogo": "EVERTON FC",
+"tm": "Everton FC",
+"slug": "fc-everton",
+"id": "29"
+},
+"6": {
+"jogo": "LEICESTER CITY",
+"tm": "Leicester City",
+"slug": "leicester-city",
+"id": "1003"
+},
+"7": {
+"jogo": "WATFORD FC",
+"tm": "Watford FC",
+"slug": "fc-watford",
+"id": "1010"
+},
+"8": {
+"jogo": "LIVERPOOL",
+"tm": "Liverpool FC",
+"slug": "fc-liverpool",
+"id": "31"
+},
+"9": {
+"jogo": "MANCHESTER CITY",
+"tm": "Manchester City",
+"slug": "manchester-city",
+"id": "281"
+},
+"10": {
+"jogo": "MANCHESTER UNITED",
+"tm": "Manchester United",
+"slug": "manchester-united",
+"id": "985"
+},
+"11": {
+"jogo": "BURNLEY",
+"tm": "Burnley FC",
+"slug": "fc-burnley",
+"id": "1132"
+},
+"12": {
+"jogo": "BRIGHTON H.A",
+"tm": "Brighton & Hove Albion",
+"slug": "brighton-amp-hove-albion",
+"id": "1237"
+},
+"13": {
+"jogo": "SOUTHAMPTON",
+"tm": "Southampton FC",
+"slug": "fc-southampton",
+"id": "180"
+},
+"14": {
+"jogo": "STOKE CITY",
+"tm": "Stoke City",
+"slug": "stoke-city",
+"id": "512"
+},
+"15": {
+"jogo": "HUDDERSFIELD",
+"tm": "Huddersfield Town",
+"slug": "huddersfield-town",
+"id": "1110"
+},
+"16": {
+"jogo": "SWANSEA CITY",
+"tm": "Swansea City",
+"slug": "swansea-city",
+"id": "2288"
+},
+"17": {
+"jogo": "TOTTENHAM HOTSPUR",
+"tm": "Tottenham Hotspur",
+"slug": "tottenham-hotspur",
+"id": "148"
+},
+"18": {
+"jogo": "WEST BROMWICH ALBION",
+"tm": "West Bromwich Albion",
+"slug": "west-bromwich-albion",
+"id": "984"
+},
+"19": {
+"jogo": "WEST HAM UNITED",
+"tm": "West Ham United",
+"slug": "west-ham-united",
+"id": "379"
+},
+"20": {
+"jogo": "PALMEIRAS",
+"tm": "Sociedade Esportiva Palmeiras",
+"slug": "se-palmeiras-sao-paulo",
+"id": "1023"
+},
+"21": {
+"jogo": "SAO PAULO",
+"tm": "São Paulo Futebol Clube",
+"slug": "fc-sao-paulo",
+"id": "585"
+},
+"22": {
+"jogo": "SANTOS",
+"tm": "Santos FC",
+"slug": "fc-santos",
+"id": "221"
+},
+"23": {
+"jogo": "CORINTHIANS",
+"tm": "Sport Club Corinthians Paulista",
+"slug": "corinthians-sao-paulo",
+"id": "199"
+},
+"24": {
+"jogo": "FLUMINENSE",
+"tm": "Fluminense Football Club",
+"slug": "fluminense-rio-de-janeiro",
+"id": "2462"
+},
+"25": {
+"jogo": "BOTAFOGO",
+"tm": "Botafogo de Futebol e Regatas",
+"slug": "botafogo-rio-de-janeiro",
+"id": "537"
+},
+"26": {
+"jogo": "BAHIA",
+"tm": "Esporte Clube Bahia",
+"slug": "esporte-clube-bahia",
+"id": "10010"
+},
+"27": {
+"jogo": "SPORT",
+"tm": "Sport Club do Recife",
+"slug": "sport-club-do-recife",
+"id": "8718"
+},
+"28": {
+"jogo": "PONTE PRETA",
+"tm": "Associação Atlética Ponte Preta",
+"slug": "aa-ponte-preta",
+"id": "1134"
+},
+"29": {
+"jogo": "VASCO DA GAMA",
+"tm": "Clube de Regatas Vasco da Gama",
+"slug": "vasco-da-gama-rio-de-janeiro",
+"id": "978"
+},
+"30": {
+"jogo": "CORITIBA",
+"tm": "Coritiba Foot Ball Club",
+"slug": "coritiba-fc",
+"id": "776"
+},
+"31": {
+"jogo": "GREMIO",
+"tm": "Grêmio Foot-Ball Porto Alegrense",
+"slug": "gremio-porto-alegre",
+"id": "210"
+},
+"32": {
+"jogo": "ATLETICO PR",
+"tm": "Club Athletico Paranaense",
+"slug": "club-athletico-paranaense",
+"id": "679"
+},
+"33": {
+"jogo": "CHAPECOENSE",
+"tm": "Associação Chapecoense de Futebol",
+"slug": "chapecoense",
+"id": "17776"
+},
+"34": {
+"jogo": "CRUZEIRO",
+"tm": "Cruzeiro Esporte Clube",
+"slug": "ec-cruzeiro-belo-horizonte",
+"id": "609"
+},
+"35": {
+"jogo": "VITORIA",
+"tm": "Esporte Clube Vitória",
+"slug": "esporte-clube-vitoria",
+"id": "2125"
+},
+"36": {
+"jogo": "ATLETICO GO",
+"tm": "Atlético Clube Goianiense",
+"slug": "atletico-clube-goianiense",
+"id": "15172"
+},
+"37": {
+"jogo": "FLAMENGO",
+"tm": "CR Flamengo",
+"slug": "flamengo-rio-de-janeiro",
+"id": "614"
+},
+"38": {
+"jogo": "AVAI",
+"tm": "Avaí FC",
+"slug": "avai-fc-sc-",
+"id": "2035"
+},
+"39": {
+"jogo": "ATLETICO MG",
+"tm": "Clube Atlético Mineiro",
+"slug": "clube-atletico-mineiro",
+"id": "330"
+},
+"40": {
+"jogo": "ATALANTA B.C.",
+"tm": "Atalanta BC",
+"slug": "atalanta-bergamo",
+"id": "800"
+},
+"41": {
+"jogo": "BENEVENTO",
+"tm": "Benevento Calcio",
+"slug": "benevento-calcio",
+"id": "4171"
+},
+"42": {
+"jogo": "BOLOGNA FC 1909",
+"tm": "Bologna FC 1909",
+"slug": "fc-bologna",
+"id": "1025"
+},
+"43": {
+"jogo": "CAGLIARI",
+"tm": "Cagliari Calcio",
+"slug": "cagliari-calcio",
+"id": "1390"
+},
+"44": {
+"jogo": "A.C. CHIEVO VERONA",
+"tm": "Chievo Verona",
+"slug": "chievo-verona",
+"id": "862"
+},
+"45": {
+"jogo": "ACF FIORENTINA",
+"tm": "ACF Fiorentina",
+"slug": "ac-florenz",
+"id": "430"
+},
+"46": {
+"jogo": "GENOA CFC",
+"tm": "Genoa CFC",
+"slug": "genua-cfc",
+"id": "252"
+},
+"47": {
+"jogo": "INTER",
+"tm": "Inter Milan",
+"slug": "inter-mailand",
+"id": "46"
+},
+"48": {
+"jogo": "JUVENTUS F.C.",
+"tm": "Juventus FC",
+"slug": "juventus-turin",
+"id": "506"
+},
+"49": {
+"jogo": "S.S. LAZIO",
+"tm": "SS Lazio",
+"slug": "lazio-rom",
+"id": "398"
+},
+"50": {
+"jogo": "S.P.A.L 2013",
+"tm": "SPAL",
+"slug": "spal",
+"id": "2722"
+},
+"51": {
+"jogo": "A.C. MILAN",
+"tm": "AC Milan",
+"slug": "ac-mailand",
+"id": "5"
+},
+"52": {
+"jogo": "S.S.C. NAPOLI",
+"tm": "SSC Napoli",
+"slug": "ssc-neapel",
+"id": "6195"
+},
+"53": {
+"jogo": "CROTONE",
+"tm": "FC Crotone",
+"slug": "fc-crotone",
+"id": "4083"
+},
+"54": {
+"jogo": "A.S. ROMA",
+"tm": "AS Roma",
+"slug": "as-rom",
+"id": "12"
+},
+"55": {
+"jogo": "U.C. SAMPDORIA",
+"tm": "UC Sampdoria",
+"slug": "sampdoria-genua",
+"id": "1038"
+},
+"56": {
+"jogo": "SASSUOLO",
+"tm": "US Sassuolo",
+"slug": "us-sassuolo",
+"id": "6574"
+},
+"57": {
+"jogo": "TORINO F.C.",
+"tm": "Torino FC",
+"slug": "fc-turin",
+"id": "416"
+},
+"58": {
+"jogo": "UDINESE CALCIO",
+"tm": "Udinese Calcio",
+"slug": "udinese-calcio",
+"id": "410"
+},
+"59": {
+"jogo": "VERONA",
+"tm": "Hellas Verona",
+"slug": "hellas-verona",
+"id": "276"
+},
+"60": {
+"jogo": "AUGSBURG FC",
+"tm": "FC Augsburg",
+"slug": "fc-augsburg",
+"id": "167"
+},
+"61": {
+"jogo": "BAYERN",
+"tm": "FC Bayern Munich",
+"slug": "fc-bayern-munchen",
+"id": "27"
+},
+"62": {
+"jogo": "LEVER",
+"tm": "Bayer 04 Leverkusen",
+"slug": "bayer-04-leverkusen",
+"id": "15"
+},
+"63": {
+"jogo": "B.DORTMUND",
+"tm": "Borussia Dortmund",
+"slug": "borussia-dortmund",
+"id": "16"
+},
+"64": {
+"jogo": "MONCHENGALBA",
+"tm": "Borussia Mönchengladbach",
+"slug": "borussia-monchengladbach",
+"id": "18"
+},
+"65": {
+"jogo": "FC COLONIA",
+"tm": "1.FC Köln",
+"slug": "1-fc-koln",
+"id": "3"
+},
+"66": {
+"jogo": "FRANKFURT",
+"tm": "Eintracht Frankfurt",
+"slug": "eintracht-frankfurt",
+"id": "24"
+},
+"67": {
+"jogo": "VFB STUTTGART",
+"tm": "VfB Stuttgart",
+"slug": "vfb-stuttgart",
+"id": "79"
+},
+"68": {
+"jogo": "HAMBURGO",
+"tm": "Hamburger SV",
+"slug": "hamburger-sv",
+"id": "41"
+},
+"69": {
+"jogo": "FRE",
+"tm": "SC Freiburg",
+"slug": "sc-freiburg",
+"id": "60"
+},
+"70": {
+"jogo": "HERTA BERLIN",
+"tm": "Hertha BSC",
+"slug": "hertha-bsc",
+"id": "44"
+},
+"71": {
+"jogo": "HOFFEHA",
+"tm": "TSG 1899 Hoffenheim",
+"slug": "tsg-1899-hoffenheim",
+"id": "533"
+},
+"72": {
+"jogo": "MAINZ 05",
+"tm": "1.FSV Mainz 05",
+"slug": "1-fsv-mainz-05",
+"id": "39"
+},
+"73": {
+"jogo": "HANNOVER 96",
+"tm": "Hannover 96",
+"slug": "hannover-96",
+"id": "42"
+},
+"74": {
+"jogo": "SCHALKE 04",
+"tm": "FC Schalke 04",
+"slug": "fc-schalke-04",
+"id": "33"
+},
+"75": {
+"jogo": "RB LEIPZIG",
+"tm": "RB Leipzig",
+"slug": "rasenballsport-leipzig",
+"id": "23826"
+},
+"76": {
+"jogo": "WERDE BRE",
+"tm": "SV Werder Bremen",
+"slug": "sv-werder-bremen",
+"id": "86"
+},
+"77": {
+"jogo": "WOLFSBURG",
+"tm": "VfL Wolfsburg",
+"slug": "vfl-wolfsburg",
+"id": "82"
+},
+"78": {
+"jogo": "LEVANTE",
+"tm": "Levante UD",
+"slug": "ud-levante",
+"id": "3368"
+},
+"79": {
+"jogo": "ATHLETIC CLUB",
+"tm": "Athletic Club",
+"slug": "athletic-club-mg-",
+"id": "64918"
+},
+"80": {
+"jogo": "AT. MADRID",
+"tm": "Atlético de Madrid",
+"slug": "atletico-madrid",
+"id": "13"
+},
+"81": {
+"jogo": "FC BARCELONA",
+"tm": "FC Barcelona",
+"slug": "fc-barcelona",
+"id": "131"
+},
+"82": {
+"jogo": "R.C DEPORTIVO",
+"tm": "Deportivo A Coruña",
+"slug": "deportivo-la-coruna",
+"id": "897"
+},
+"83": {
+"jogo": "CELTA DE VIGO",
+"tm": "Celta de Vigo",
+"slug": "celta-vigo",
+"id": "940"
+},
+"84": {
+"jogo": "LAS PALMAS",
+"tm": "UD Las Palmas",
+"slug": "ud-las-palmas",
+"id": "472"
+},
+"85": {
+"jogo": "RCD ESPANYOL",
+"tm": "RCD Espanyol Barcelona",
+"slug": "espanyol-barcelona",
+"id": "714"
+},
+"86": {
+"jogo": "ALAVES ",
+"tm": "Deportivo Alavés",
+"slug": "deportivo-alaves",
+"id": "1108"
+},
+"87": {
+"jogo": "GIRONA",
+"tm": "Girona FC",
+"slug": "fc-girona",
+"id": "12321"
+},
+"88": {
+"jogo": "GETAFE",
+"tm": "Getafe CF",
+"slug": "fc-getafe",
+"id": "3709"
+},
+"89": {
+"jogo": "MÃLAGA CF",
+"tm": "Málaga CF",
+"slug": "fc-malaga",
+"id": "1084"
+},
+"90": {
+"jogo": "SD EIBAR",
+"tm": "SD Eibar",
+"slug": "sd-eibar",
+"id": "1533"
+},
+"91": {
+"jogo": "LEGANES",
+"tm": "CD Leganés",
+"slug": "cd-leganes",
+"id": "1244"
+},
+"92": {
+"jogo": "REAL MADRID",
+"tm": "Real Madrid",
+"slug": "real-madrid",
+"id": "418"
+},
+"93": {
+"jogo": "REAL SOCIEDAD",
+"tm": "Real Sociedad",
+"slug": "real-sociedad-san-sebastian",
+"id": "681"
+},
+"94": {
+"jogo": "SEVILLA FC",
+"tm": "Sevilla FC",
+"slug": "fc-sevilla",
+"id": "368"
+},
+"95": {
+"jogo": "VALENCIA CF",
+"tm": "Valencia CF",
+"slug": "fc-valencia",
+"id": "1049"
+},
+"96": {
+"jogo": "REAL BETIS",
+"tm": "Real Betis Balompié",
+"slug": "real-betis-sevilla",
+"id": "150"
+},
+"97": {
+"jogo": "VILLARREAL CF",
+"tm": "Villarreal CF",
+"slug": "fc-villarreal",
+"id": "1050"
+},
+"98": {
+"jogo": "PARIS SAINT-GER",
+"tm": "Paris Saint-Germain",
+"slug": "fc-paris-saint-germain",
+"id": "583"
+},
+"99": {
+"jogo": "CAMBUUR LEEUWA",
+"tm": "SC Cambuur Leeuwarden",
+"slug": "sc-cambuur-leeuwarden",
+"id": "133"
+},
+"100": {
+"jogo": "BATE BORISOV",
+"tm": "BATE Borisov",
+"slug": "bate-borisov",
+"id": "713"
+},
+"101": {
+"jogo": "F.C. COPENHAGEN",
+"tm": "FC Copenhagen",
+"slug": "fc-kopenhagen",
+"id": "190"
+},
+"102": {
+"jogo": "FEYENOORD",
+"tm": "Feyenoord Rotterdam",
+"slug": "feyenoord-rotterdam",
+"id": "234"
+},
+"103": {
+"jogo": "AZ",
+"tm": "AZ Alkmaar",
+"slug": "az-alkmaar",
+"id": "1090"
+},
+"104": {
+"jogo": "AJAX",
+"tm": "Ajax Amsterdam",
+"slug": "ajax-amsterdam",
+"id": "610"
+},
+"105": {
+"jogo": "FC TWENTE",
+"tm": "FC Twente Enschede",
+"slug": "fc-twente-enschede",
+"id": "317"
+},
+"106": {
+"jogo": "OLYMPIACOS FC",
+"tm": "Olympiacos Piraeus",
+"slug": "olympiakos-piraus",
+"id": "683"
+},
+"107": {
+"jogo": "PAOK F.C.",
+"tm": "PAOK Thessaloniki",
+"slug": "paok-thessaloniki",
+"id": "1091"
+},
+"108": {
+"jogo": "F.C BASEL",
+"tm": "FC Basel 1893",
+"slug": "fc-basel-1893",
+"id": "26"
+},
+"109": {
+"jogo": "NK MARIBOR",
+"tm": "NK Maribor",
+"slug": "nk-maribor",
+"id": "790"
+},
+"110": {
+"jogo": "SL BENFICA",
+"tm": "SL Benfica",
+"slug": "benfica-lissabon",
+"id": "294"
+},
+"111": {
+"jogo": "S.C. BRAGA",
+"tm": "SC Braga",
+"slug": "sc-braga",
+"id": "1075"
+},
+"112": {
+"jogo": "SPORTING DE LISBOA",
+"tm": "Sporting CP",
+"slug": "sporting-lissabon",
+"id": "336"
+},
+"113": {
+"jogo": "FC PORTO",
+"tm": "FC Porto",
+"slug": "fc-porto",
+"id": "720"
+},
+"114": {
+"jogo": "PFC CSKA MOSKVA",
+"tm": "CSKA Moscow",
+"slug": "zska-moskau",
+"id": "2410"
+},
+"115": {
+"jogo": "FC ZENIT ST. PETERSBURG",
+"tm": "Zenit St. Petersburg",
+"slug": "zenit-st-petersburg",
+"id": "964"
+},
+"116": {
+"jogo": "CELTIC FC",
+"tm": "Celtic FC",
+"slug": "celtic-glasgow",
+"id": "371"
+},
+"117": {
+"jogo": "PFC LUDOGORETS",
+"tm": "Ludogorets Razgrad",
+"slug": "pfk-ludogorets-razgrad",
+"id": "31614"
+},
+"118": {
+"jogo": "SANTA CRUZ",
+"tm": "Santa Cruz FC (PE)",
+"slug": "santa-cruz-futebol-clube-pe-",
+"id": "1785"
+},
+"119": {
+"jogo": "INTERNACIONAL",
+"tm": "Sport Club Internacional",
+"slug": "sc-internacional-porto-alegre",
+"id": "6600"
+},
+"120": {
+"jogo": "BRASIL RS",
+"tm": "Grêmio Esportivo Brasil (RS)",
+"slug": "gremio-esportivo-brasil-rs-",
+"id": "10560"
+},
+"121": {
+"jogo": "CRICIUMA",
+"tm": "Criciúma EC",
+"slug": "criciuma-esporte-clube",
+"id": "7178"
+},
+"122": {
+"jogo": "GOIAS",
+"tm": "Goiás EC",
+"slug": "goias-ec",
+"id": "3197"
+},
+"123": {
+"jogo": "PAYSANDU",
+"tm": "Paysandu SC",
+"slug": "paysandu-sport-club-pa-",
+"id": "6347"
+},
+"124": {
+"jogo": "FIGUEIRENSE",
+"tm": "Figueirense Futebol Clube",
+"slug": "figueirense-fc",
+"id": "4064"
+},
+"125": {
+"jogo": "CEARA",
+"tm": "Ceará Sporting Club",
+"slug": "ceara-sporting-club",
+"id": "2029"
+}
+}
